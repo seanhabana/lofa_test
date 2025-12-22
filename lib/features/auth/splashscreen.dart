@@ -1,31 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import '../components/animatedlogo.dart';
-import './onboarding.dart';
 
-class SplashScreen extends StatefulWidget {
+import '../../widgets/animatedlogo.dart';
+import './onboarding.dart';
+import '../dashboard/home_screen.dart';
+import './loginpage.dart';
+import '../../providers/auth_session_provider.dart';
+
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  WidgetsBinding.instance.allowFirstFrame();
+    WidgetsBinding.instance.allowFirstFrame();
 
-  Future.delayed(const Duration(milliseconds: 3000), () {
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const OnboardingPage()),
-    );
-  });
-}
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (!mounted) return;
 
+      final auth = ref.read(authSessionProvider);
+
+      if (auth.isLoggedIn) {
+        // ✅ Remembered user → Home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => HomePage()),
+        );
+      } else {
+        // ❌ Not logged in → Onboarding or Login
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingPage()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,24 +49,18 @@ void initState() {
       backgroundColor: const Color(0xFFF7F7FB),
       body: Stack(
         children: [
-          // Center animated logo
-          const Center(
+          Center(
             child: AnimatedLogo(),
           ),
 
-          // Bottom loading indicator
-          Positioned(
+          const Positioned(
             bottom: 48,
             left: 0,
             right: 0,
-            child: Column(
-              children: const [
-                SpinKitRing(
-                  color: Color(0xFF581C87), // purplish
-                  size: 36,
-                  lineWidth: 3,
-                ),
-              ],
+            child: SpinKitRing(
+              color: Color(0xFF813E98),
+              size: 36,
+              lineWidth: 5,
             ),
           ),
         ],

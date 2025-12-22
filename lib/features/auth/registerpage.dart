@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/authprovider.dart';
+import '../../widgets/authtopbar.dart';
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -30,48 +31,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF581C87),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: -50,
-                      child: Transform.rotate(
-                        angle: 0.3,
-                        child: Column(
-                          children: [
-                            _buildPatternLine(200, 0xFF813E98),
-                            const SizedBox(height: 30),
-                            _buildPatternLine(250, 0xFF9D65AA),
-                            const SizedBox(height: 30),
-                            _buildPatternLine(180, 0xFFCBA4CC),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: -30,
-                      child: Transform.rotate(
-                        angle: -0.3,
-                        child: Column(
-                          children: [
-                            _buildPatternLine(150, 0xFF9D65AA),
-                            const SizedBox(height: 25),
-                            _buildPatternLine(200, 0xFF813E98),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Content
-                    _buildHeaderContent(),
-                  ],
-                ),
-              ),
+                                          AuthTopBar(title: 'LOFA Consulting'),
 
               // Form section
               Padding(
@@ -425,44 +385,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         ),
       ),
     );
-  }
-
-  Widget _buildHeaderContent() {
-    return Center(
-      child: Column(
-        children: [
-          const SizedBox(height: 60),
-          Image.asset(
-            'assets/logo/logo_white_cropped.png',
-            height: 100,
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'LOFA Consulting',
-            style: TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPatternLine(double width, int colorHex) {
-    return Container(
-      width: width,
-      height: 4,
-      decoration: BoxDecoration(
-        color: Color(colorHex).withOpacity(0.3),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
+  }  
 }
+
 class TermsPage extends StatelessWidget {
   final String title;
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/authprovider.dart';
+import '../../widgets/authtopbar.dart';
 
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -34,7 +35,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final forgotPasswordState = ref.watch(forgotPasswordProvider);
-    
+
     // Listen to success messages
     ref.listen<ForgotPasswordState>(forgotPasswordProvider, (previous, next) {
       if (next.successMessage != null) {
@@ -49,47 +50,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           child: Column(
             children: [
               // Top pattern section
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(color: Color(0xFF581C87)),
-                child: Stack(
-                  children: [
-                    // Diagonal pattern lines
-                    Positioned(
-                      top: 0,
-                      right: -50,
-                      child: Transform.rotate(
-                        angle: 0.3,
-                        child: Column(
-                          children: [
-                            _buildPatternLine(200, 0xFF813E98),
-                            const SizedBox(height: 30),
-                            _buildPatternLine(250, 0xFF9D65AA),
-                            const SizedBox(height: 30),
-                            _buildPatternLine(180, 0xFFCBA4CC),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: -30,
-                      child: Transform.rotate(
-                        angle: -0.3,
-                        child: Column(
-                          children: [
-                            _buildPatternLine(150, 0xFF9D65AA),
-                            const SizedBox(height: 25),
-                            _buildPatternLine(200, 0xFF813E98),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Content
-                    _buildHeaderContent(),
-                  ],
-                ),
-              ),
+              AuthTopBar(title: 'LOFA Consulting'),
 
               // Form section
               Padding(
@@ -100,7 +61,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
                     // Title
                     Text(
-                      forgotPasswordState.isCodeSent ? 'Verify Code' : 'Forgot Password',
+                      forgotPasswordState.isCodeSent
+                          ? 'Verify Code'
+                          : 'Forgot Password',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -129,12 +92,19 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.red[700],
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 forgotPasswordState.errorMessage!,
-                                style: TextStyle(color: Colors.red[700], fontSize: 14),
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],
@@ -145,7 +115,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                     if (!forgotPasswordState.isCodeSent) ...[
                       // Email input section
                       TextField(
-                        onChanged: (value) => ref.read(forgotPasswordProvider.notifier).updateEmail(value),
+                        onChanged: (value) => ref
+                            .read(forgotPasswordProvider.notifier)
+                            .updateEmail(value),
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           hintText: 'Email',
@@ -187,7 +159,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                           onPressed: forgotPasswordState.isLoading
                               ? null
                               : () async {
-                                  await ref.read(forgotPasswordProvider.notifier).sendCode();
+                                  await ref
+                                      .read(forgotPasswordProvider.notifier)
+                                      .sendCode();
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF581C87),
@@ -261,8 +235,10 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                 ),
                               ),
                               onChanged: (value) {
-                                ref.read(forgotPasswordProvider.notifier).updateCodeDigit(index, value);
-                                
+                                ref
+                                    .read(forgotPasswordProvider.notifier)
+                                    .updateCodeDigit(index, value);
+
                                 if (value.length == 1 && index < 5) {
                                   _codeFocusNodes[index + 1].requestFocus();
                                 } else if (value.isEmpty && index > 0) {
@@ -277,9 +253,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
                       // Resend Code Button
                       TextButton(
-                        onPressed: forgotPasswordState.isResendEnabled && !forgotPasswordState.isLoading
+                        onPressed:
+                            forgotPasswordState.isResendEnabled &&
+                                !forgotPasswordState.isLoading
                             ? () async {
-                                await ref.read(forgotPasswordProvider.notifier).resendCode();
+                                await ref
+                                    .read(forgotPasswordProvider.notifier)
+                                    .resendCode();
                               }
                             : null,
                         child: Text(
@@ -305,10 +285,14 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                           onPressed: forgotPasswordState.isLoading
                               ? null
                               : () async {
-                                  final success = await ref.read(forgotPasswordProvider.notifier).verifyCode();
+                                  final success = await ref
+                                      .read(forgotPasswordProvider.notifier)
+                                      .verifyCode();
                                   if (success && mounted) {
                                     // TODO: Navigate to reset password page
-                                    _showMessage('Code verified! Proceed to reset password');
+                                    _showMessage(
+                                      'Code verified! Proceed to reset password',
+                                    );
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
@@ -378,39 +362,6 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderContent() {
-    return Center(
-      child: Column(
-        children: [
-          const SizedBox(height: 60),
-          Image.asset('assets/logo/logo_white_cropped.png', height: 100),
-          const SizedBox(height: 20),
-          const Text(
-            'LOFA Consulting',
-            style: TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPatternLine(double width, int colorHex) {
-    return Container(
-      width: width,
-      height: 4,
-      decoration: BoxDecoration(
-        color: Color(colorHex).withOpacity(0.3),
-        borderRadius: BorderRadius.circular(2),
       ),
     );
   }

@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/splashscreen.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'core/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -25,6 +25,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       theme: ThemeData(
     textTheme: GoogleFonts.fredokaTextTheme(),
+
+    
   ),
 
       debugShowCheckedModeBanner: false,
