@@ -1,34 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import './registerpage.dart';
+import './forgotpasswordpage.dart';
+import '../../providers/authprovider.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formState = ref.watch(loginFormProvider);
+    final obscurePassword = ref.watch(obscureLoginPasswordProvider);
 
-class _LoginPageState extends State<LoginPage> {
-  bool _rememberMe = false;
-  final FocusNode _emailFocusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    // Automatically focus on email field when page loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _emailFocusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _emailFocusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
       body: SafeArea(
@@ -101,10 +84,34 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 40),
 
+                    // Error message
+                    if (formState.errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                formState.errorMessage!,
+                                style: TextStyle(color: Colors.red[700], fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Email Field
                     TextField(
-                      focusNode: _emailFocusNode,
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (value) => ref.read(loginFormProvider.notifier).updateEmail(value),
                       decoration: InputDecoration(
                         hintText: 'Email',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -139,7 +146,8 @@ class _LoginPageState extends State<LoginPage> {
 
                     // Password Field
                     TextField(
-                      obscureText: true,
+                      obscureText: obscurePassword,
+                      onChanged: (value) => ref.read(loginFormProvider.notifier).updatePassword(value),
                       decoration: InputDecoration(
                         hintText: 'Password',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -149,9 +157,16 @@ class _LoginPageState extends State<LoginPage> {
                           Icons.lock_outline,
                           color: Color(0xFF9D65AA),
                         ),
-                        suffixIcon: const Icon(
-                          Icons.visibility_off_outlined,
-                          color: Color(0xFFCBA4CC),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFFCBA4CC),
+                          ),
+                          onPressed: () {
+                            ref.read(obscureLoginPasswordProvider.notifier).state = !obscurePassword;
+                          },
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20,
@@ -183,9 +198,7 @@ class _LoginPageState extends State<LoginPage> {
                         // Remember Me
                         InkWell(
                           onTap: () {
-                            setState(() {
-                              _rememberMe = !_rememberMe;
-                            });
+                            ref.read(loginFormProvider.notifier).toggleRememberMe();
                           },
                           borderRadius: BorderRadius.circular(4),
                           child: Row(
@@ -194,11 +207,9 @@ class _LoginPageState extends State<LoginPage> {
                                 width: 20,
                                 height: 20,
                                 child: Checkbox(
-                                  value: _rememberMe,
+                                  value: formState.rememberMe,
                                   onChanged: (value) {
-                                    setState(() {
-                                      _rememberMe = value ?? false;
-                                    });
+                                    ref.read(loginFormProvider.notifier).toggleRememberMe();
                                   },
                                   activeColor: const Color(0xFF581C87),
                                   shape: RoundedRectangleBorder(
@@ -221,7 +232,12 @@ class _LoginPageState extends State<LoginPage> {
                         // Forgot Password
                         TextButton(
                           onPressed: () {
-                            // TODO: handle forgot password
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordPage(),
+                              ),
+                            );
                           },
                           child: const Text(
                             'Forgot Password?',
@@ -240,9 +256,19 @@ class _LoginPageState extends State<LoginPage> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // TODO: handle login
-                        },
+                        onPressed: formState.isLoading
+                            ? null
+                            : () async {
+                                final success = await ref.read(loginFormProvider.notifier).login();
+                                if (success && context.mounted) {
+                                  // Navigate to home or show success message
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Login successful!')),
+                                  );
+                                  // TODO: Navigate to home page
+                                  // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage()));
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF581C87),
                           foregroundColor: Colors.white,
@@ -251,14 +277,23 @@ class _LoginPageState extends State<LoginPage> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        child: formState.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 24),

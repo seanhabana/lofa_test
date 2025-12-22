@@ -22,17 +22,17 @@ class _AnimatedLogoState extends State<AnimatedLogo>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 500),
     );
 
-    // Top part: stacked above → slides left
+    // Top part: stacked above → slides left with ease in/out
     _part1Offset = Tween<Offset>(
       begin: const Offset(0, -42),
       end: const Offset(-45, 0),
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Curves.easeInOutCubic,
+        curve: Curves.easeInOut, // Slow start, fast middle, slow end
       ),
     );
 
@@ -43,23 +43,23 @@ class _AnimatedLogoState extends State<AnimatedLogo>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Curves.easeInOutCubic,
+        curve: Curves.easeInOut,
       ),
     );
 
-    // Bottom part: stacked below → slides right
+    // Bottom part: stacked below → slides right with ease in/out
     _part3Offset = Tween<Offset>(
       begin: const Offset(0, 42),
       end: const Offset(45, 0),
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Curves.easeInOutCubic,
+        curve: Curves.easeInOut, // Slow start, fast middle, slow end
       ),
     );
 
-    // Auto-start animation after 0.5s (splash behavior)
-    Future.delayed(const Duration(milliseconds: 500), () {
+    // Start animation after 1 second (matches fade in timing)
+    Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
         _controller.forward();
       }

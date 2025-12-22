@@ -1,25 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/authprovider.dart';
 
-class SignUpPage extends StatefulWidget {
+class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
 
   @override
-  State<SignUpPage> createState() => _SignUpPageState();
+  ConsumerState<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _SignUpPageState extends State<SignUpPage> {
+class _SignUpPageState extends ConsumerState<SignUpPage> {
   final FocusNode _firstNameFocusNode = FocusNode();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-    // Automatically focus on first name field when page loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _firstNameFocusNode.requestFocus();
-    });
-  }
 
   @override
   void dispose() {
@@ -29,13 +20,16 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
+    final formState = ref.watch(signUpFormProvider);
+    final obscurePassword = ref.watch(obscurePasswordProvider);
+    final obscureConfirmPassword = ref.watch(obscureConfirmPasswordProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Top pattern section with logo
               Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
@@ -43,7 +37,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 child: Stack(
                   children: [
-                    // Diagonal pattern lines
                     Positioned(
                       top: 0,
                       right: -50,
@@ -103,10 +96,33 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 40),
 
-                    // Full Name field (replaces First Name + Last Name)
+                    if (formState.errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                formState.errorMessage!,
+                                style: TextStyle(color: Colors.red[700], fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     TextField(
                       focusNode: _firstNameFocusNode,
                       textCapitalization: TextCapitalization.words,
+                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateFullName(value),
                       decoration: InputDecoration(
                         hintText: 'Full Name',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -139,9 +155,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Email Field
                     TextField(
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateEmail(value),
                       decoration: InputDecoration(
                         hintText: 'Email',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -174,9 +190,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Password Field
                     TextField(
-                      obscureText: _obscurePassword,
+                      obscureText: obscurePassword,
+                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updatePassword(value),
                       decoration: InputDecoration(
                         hintText: 'Password',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -188,15 +204,13 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword
+                            obscurePassword
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
                             color: const Color(0xFFCBA4CC),
                           ),
                           onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
+                            ref.read(obscurePasswordProvider.notifier).state = !obscurePassword;
                           },
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -222,9 +236,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Confirm Password Field
                     TextField(
-                      obscureText: _obscureConfirmPassword,
+                      obscureText: obscureConfirmPassword,
+                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateConfirmPassword(value),
                       decoration: InputDecoration(
                         hintText: 'Confirm Password',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -236,15 +250,13 @@ class _SignUpPageState extends State<SignUpPage> {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword
+                            obscureConfirmPassword
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
                             color: const Color(0xFFCBA4CC),
                           ),
                           onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
-                            });
+                            ref.read(obscureConfirmPasswordProvider.notifier).state = !obscureConfirmPassword;
                           },
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -270,7 +282,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Terms and Privacy
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: RichText(
@@ -332,14 +343,20 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Sign Up Button
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // TODO: handle sign up
-                        },
+                        onPressed: formState.isLoading
+                            ? null
+                            : () async {
+                                final success = await ref.read(signUpFormProvider.notifier).signUp();
+                                if (success && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Sign up successful!')),
+                                  );
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF581C87),
                           foregroundColor: Colors.white,
@@ -348,19 +365,27 @@ class _SignUpPageState extends State<SignUpPage> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                        child: formState.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 24),
 
-                    // Sign In Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -438,8 +463,6 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 }
-
-// Simple placeholder page for Terms and Privacy
 class TermsPage extends StatelessWidget {
   final String title;
 
