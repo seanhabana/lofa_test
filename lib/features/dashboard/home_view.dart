@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/course_provider.dart';
+import '../courses/course_detail_view.dart';
 
 class HomeView extends ConsumerWidget {
   const HomeView({super.key});
@@ -46,7 +47,7 @@ class HomeView extends ConsumerWidget {
                   scrollDirection: Axis.horizontal,
                   itemCount: state.featuredCourses.length,
                   itemBuilder: (context, index) {
-                    return _buildFeaturedCourseCard(state.featuredCourses[index]);
+                    return _buildFeaturedCourseCard(context, state.featuredCourses[index]);
                   },
                 ),
               ),
@@ -173,8 +174,17 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildFeaturedCourseCard(Course course) {
-    return Container(
+  Widget _buildFeaturedCourseCard(BuildContext context, Course course) {
+     
+    return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CourseDetailView(courseId: course.id),
+        ),
+      );
+    },child: Container(
       width: 320,
       margin: const EdgeInsets.only(right: 16),
       decoration: BoxDecoration(
@@ -323,10 +333,11 @@ class HomeView extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '₱${course.price.toStringAsFixed(0)}',
+                      // display plan label instead of peso price
+                      '${course.plan[0].toUpperCase()}${course.plan.substring(1)}',
                       style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                         color: Color(0xFF581C87),
                       ),
                     ),
@@ -338,7 +349,8 @@ class HomeView extends ConsumerWidget {
           
         ],
       ),
-    );
+    ));
+    
   }
 
   Widget _buildEnrolledCourseCard(Course course) {
@@ -598,9 +610,9 @@ Widget _buildRecommendedCourseCard(Course course) {
 
               const SizedBox(height: 8),
               Text(
-                '₱${course.price.toStringAsFixed(0)}',
+                '${course.plan[0].toUpperCase()}${course.plan.substring(1)}',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF581C87),
                 ),

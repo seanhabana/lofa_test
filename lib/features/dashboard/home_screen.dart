@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/navigation_provider.dart';
-import '../../widgets/bottom_navbar.dart';
+import '../../shared/bottom_navbar.dart';
 import '../account/accounts_view.dart';
 import '../certificates/certificates_view.dart';
 import '../courses/courses_view.dart';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
-import '../../widgets/animatedlogo.dart';
+import '../../shared/animatedlogo.dart';
 import './onboarding.dart';
 import '../dashboard/home_screen.dart';
 import './loginpage.dart';

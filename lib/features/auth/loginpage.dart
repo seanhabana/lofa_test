@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_session_provider.dart';
-import '../../widgets/authtopbar.dart';
+import '../../shared/authtopbar.dart';
 import '../dashboard/home_screen.dart';
 import './registerpage.dart';
 import './forgotpasswordpage.dart';
