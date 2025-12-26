@@ -20,22 +20,16 @@ class SettingsView extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 20),
-              // Logo/App Name
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF581C87),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.school,
-                  size: 48,
-                  color: Colors.white,
+              ClipOval(
+                child: Image.asset(
+                  'assets/logo/logo_app.png',
+                  width: 156,
+                  height: 156,
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(height: 16),
               const Text(
-                'NDIS Learning Hub',
+                'LOFA Consulting',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -65,7 +59,7 @@ class SettingsView extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildMenuButton(
                 context,
                 icon: Icons.payment_outlined,
@@ -78,7 +72,7 @@ class SettingsView extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildMenuButton(
                 context,
                 icon: Icons.workspace_premium_outlined,
@@ -91,7 +85,7 @@ class SettingsView extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildMenuButton(
                 context,
                 icon: Icons.settings_outlined,
@@ -104,7 +98,7 @@ class SettingsView extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildMenuButton(
                 context,
                 icon: Icons.contact_support_outlined,
@@ -156,60 +150,35 @@ class SettingsView extends ConsumerWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF581C87).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: const Color(0xFF581C87),
-              ),
+            Icon(
+              icon,
+              size: 22,
+              color: const Color(0xFF581C87),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
               ),
             ),
             Icon(
               Icons.chevron_right,
+              size: 20,
               color: Colors.grey[400],
             ),
           ],
