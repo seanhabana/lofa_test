@@ -1,5 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
+import '../repositories/auth_repository.dart';
+import '../models/auth_models.dart';
+
+// Repository Provider
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  return AuthRepository();
+});
 
 // Sign up
 class SignUpFormState {
@@ -38,9 +45,10 @@ class SignUpFormState {
   }
 }
 
-// State notifier class
 class SignUpFormNotifier extends StateNotifier<SignUpFormState> {
-  SignUpFormNotifier() : super(SignUpFormState());
+  final AuthRepository _authRepository;
+
+  SignUpFormNotifier(this._authRepository) : super(SignUpFormState());
 
   void updateFullName(String value) {
     state = state.copyWith(fullName: value, errorMessage: null);
@@ -58,58 +66,58 @@ class SignUpFormNotifier extends StateNotifier<SignUpFormState> {
     state = state.copyWith(confirmPassword: value, errorMessage: null);
   }
 
-  Future<bool> signUp() async {
-    // Validation
+  Future<RegisterResponse?> signUp() async {
     if (state.fullName.isEmpty) {
       state = state.copyWith(errorMessage: 'Please enter your full name');
-      return false;
+      return null;
     }
 
     if (state.email.isEmpty || !state.email.contains('@')) {
       state = state.copyWith(errorMessage: 'Please enter a valid email');
-      return false;
+      return null;
     }
 
     if (state.password.isEmpty || state.password.length < 6) {
       state = state.copyWith(errorMessage: 'Password must be at least 6 characters');
-      return false;
+      return null;
     }
 
     if (state.password != state.confirmPassword) {
       state = state.copyWith(errorMessage: 'Passwords do not match');
-      return false;
+      return null;
     }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      await Future.delayed(const Duration(seconds: 2)); 
+      final response = await _authRepository.register(
+        name: state.fullName,
+        email: state.email,
+        password: state.password,
+        passwordConfirmation: state.confirmPassword,
+      );
       
       state = state.copyWith(isLoading: false);
-      return true;
+      return response;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Sign up failed: ${e.toString()}',
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
-      return false;
+      return null;
     }
   }
 }
 
-
-
-// Provider for the sign-up form
 final signUpFormProvider = StateNotifierProvider<SignUpFormNotifier, SignUpFormState>((ref) {
-  return SignUpFormNotifier();
+  final authRepository = ref.watch(authRepositoryProvider);
+  return SignUpFormNotifier(authRepository);
 });
 
-// Provider for password visibility
 final obscurePasswordProvider = StateProvider<bool>((ref) => true);
 final obscureConfirmPasswordProvider = StateProvider<bool>((ref) => true);
 
 // Login
-
 class LoginFormState {
   final String email;
   final String password;
@@ -142,9 +150,10 @@ class LoginFormState {
   }
 }
 
-// Login Form Notifier
 class LoginFormNotifier extends StateNotifier<LoginFormState> {
-  LoginFormNotifier() : super(LoginFormState());
+  final AuthRepository _authRepository;
+
+  LoginFormNotifier(this._authRepository) : super(LoginFormState());
 
   void updateEmail(String value) {
     state = state.copyWith(email: value, errorMessage: null);
@@ -158,44 +167,45 @@ class LoginFormNotifier extends StateNotifier<LoginFormState> {
     state = state.copyWith(rememberMe: !state.rememberMe);
   }
 
-  Future<bool> login() async {
-    // Validation
+  Future<LoginResponse?> login() async {
     if (state.email.isEmpty || !state.email.contains('@')) {
       state = state.copyWith(errorMessage: 'Please enter a valid email');
-      return false;
+      return null;
     }
 
     if (state.password.isEmpty) {
       state = state.copyWith(errorMessage: 'Please enter your password');
-      return false;
+      return null;
     }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // TODO: Implement actual login logic here
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      final response = await _authRepository.login(
+        email: state.email,
+        password: state.password,
+      );
       
       state = state.copyWith(isLoading: false);
-      return true;
+      return response;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Login failed: ${e.toString()}',
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
-      return false;
+      return null;
     }
   }
 }
 
-// Provider for the login form
 final loginFormProvider = StateNotifierProvider<LoginFormNotifier, LoginFormState>((ref) {
-  return LoginFormNotifier();
+  final authRepository = ref.watch(authRepositoryProvider);
+  return LoginFormNotifier(authRepository);
 });
 
-// Provider for login password visibility
 final obscureLoginPasswordProvider = StateProvider<bool>((ref) => true);
 
+// Forgot Password (keep existing code but update repository calls)
 class ForgotPasswordState {
   final String email;
   final List<String> codeDigits;
@@ -242,10 +252,11 @@ class ForgotPasswordState {
   String get fullCode => codeDigits.join();
 }
 
-// Forgot Password Notifier
 class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
-  ForgotPasswordNotifier() : super(ForgotPasswordState());
+  final AuthRepository _authRepository;
   Timer? _countdownTimer;
+
+  ForgotPasswordNotifier(this._authRepository) : super(ForgotPasswordState());
 
   @override
   void dispose() {
@@ -295,8 +306,7 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // TODO: Implement actual API call to send code
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      await _authRepository.sendPasswordResetCode(email: state.email);
       
       state = state.copyWith(
         isLoading: false,
@@ -309,7 +319,7 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to send code: ${e.toString()}',
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return false;
     }
@@ -317,28 +327,7 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
 
   Future<bool> resendCode() async {
     if (!state.isResendEnabled) return false;
-
-    state = state.copyWith(isLoading: true, errorMessage: null);
-
-    try {
-      // TODO: Implement actual API call to resend code
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-      
-      state = state.copyWith(
-        isLoading: false,
-        successMessage: 'Verification code resent',
-      );
-      
-      clearCode();
-      _startCountdown();
-      return true;
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Failed to resend code: ${e.toString()}',
-      );
-      return false;
-    }
+    return await sendCode();
   }
 
   void _startCountdown() {
@@ -370,8 +359,10 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // TODO: Implement actual API call to verify code
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      await _authRepository.verifyPasswordResetCode(
+        email: state.email,
+        code: state.fullCode,
+      );
       
       state = state.copyWith(
         isLoading: false,
@@ -382,7 +373,7 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Invalid verification code',
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return false;
     }
@@ -394,7 +385,7 @@ class ForgotPasswordNotifier extends StateNotifier<ForgotPasswordState> {
   }
 }
 
-// Provider for forgot password
 final forgotPasswordProvider = StateNotifierProvider<ForgotPasswordNotifier, ForgotPasswordState>((ref) {
-  return ForgotPasswordNotifier();
+  final authRepository = ref.watch(authRepositoryProvider);
+  return ForgotPasswordNotifier(authRepository);
 });

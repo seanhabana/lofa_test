@@ -31,7 +31,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-                                          AuthTopBar(title: 'LOFA Consulting'),
+              AuthTopBar(title: 'LOFA Consulting'),
 
               // Form section
               Padding(
@@ -67,12 +67,19 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.red[700],
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 formState.errorMessage!,
-                                style: TextStyle(color: Colors.red[700], fontSize: 14),
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],
@@ -82,7 +89,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     TextField(
                       focusNode: _firstNameFocusNode,
                       textCapitalization: TextCapitalization.words,
-                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateFullName(value),
+                      onChanged: (value) => ref
+                          .read(signUpFormProvider.notifier)
+                          .updateFullName(value),
                       decoration: InputDecoration(
                         hintText: 'Full Name',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -117,7 +126,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
                     TextField(
                       keyboardType: TextInputType.emailAddress,
-                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateEmail(value),
+                      onChanged: (value) => ref
+                          .read(signUpFormProvider.notifier)
+                          .updateEmail(value),
                       decoration: InputDecoration(
                         hintText: 'Email',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -152,7 +163,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
                     TextField(
                       obscureText: obscurePassword,
-                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updatePassword(value),
+                      onChanged: (value) => ref
+                          .read(signUpFormProvider.notifier)
+                          .updatePassword(value),
                       decoration: InputDecoration(
                         hintText: 'Password',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -170,7 +183,8 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             color: const Color(0xFFCBA4CC),
                           ),
                           onPressed: () {
-                            ref.read(obscurePasswordProvider.notifier).state = !obscurePassword;
+                            ref.read(obscurePasswordProvider.notifier).state =
+                                !obscurePassword;
                           },
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -198,7 +212,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
 
                     TextField(
                       obscureText: obscureConfirmPassword,
-                      onChanged: (value) => ref.read(signUpFormProvider.notifier).updateConfirmPassword(value),
+                      onChanged: (value) => ref
+                          .read(signUpFormProvider.notifier)
+                          .updateConfirmPassword(value),
                       decoration: InputDecoration(
                         hintText: 'Confirm Password',
                         hintStyle: TextStyle(color: Colors.grey[400]),
@@ -216,7 +232,12 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             color: const Color(0xFFCBA4CC),
                           ),
                           onPressed: () {
-                            ref.read(obscureConfirmPasswordProvider.notifier).state = !obscureConfirmPassword;
+                            ref
+                                    .read(
+                                      obscureConfirmPasswordProvider.notifier,
+                                    )
+                                    .state =
+                                !obscureConfirmPassword;
                           },
                         ),
                         contentPadding: const EdgeInsets.symmetric(
@@ -253,14 +274,18 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             height: 1.5,
                           ),
                           children: [
-                            const TextSpan(text: 'By creating an account, you agree to our '),
+                            const TextSpan(
+                              text: 'By creating an account, you agree to our ',
+                            ),
                             WidgetSpan(
                               child: GestureDetector(
                                 onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const TermsPage(title: 'Terms of Service'),
+                                      builder: (_) => const TermsPage(
+                                        title: 'Terms of Service',
+                                      ),
                                     ),
                                   );
                                 },
@@ -282,7 +307,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const TermsPage(title: 'Privacy Policy'),
+                                      builder: (_) => const TermsPage(
+                                        title: 'Privacy Policy',
+                                      ),
                                     ),
                                   );
                                 },
@@ -310,11 +337,20 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                         onPressed: formState.isLoading
                             ? null
                             : () async {
-                                final success = await ref.read(signUpFormProvider.notifier).signUp();
-                                if (success && mounted) {
+                                final response = await ref
+                                    .read(signUpFormProvider.notifier)
+                                    .signUp();
+                                if (response != null && mounted) {
+                                  // Show success message
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Sign up successful!')),
+                                    SnackBar(
+                                      content: Text(response.message),
+                                      backgroundColor: Colors.green,
+                                    ),
                                   );
+
+                                  // Navigate back to login page
+                                  Navigator.pop(context);
                                 }
                               },
                         style: ElevatedButton.styleFrom(
@@ -385,7 +421,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
         ),
       ),
     );
-  }  
+  }
 }
 
 class TermsPage extends StatelessWidget {
@@ -419,10 +455,7 @@ class TermsPage extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'Last updated: ${DateTime.now().toString().split(' ')[0]}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
             const SizedBox(height: 32),
             Text(

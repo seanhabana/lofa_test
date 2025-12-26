@@ -234,59 +234,62 @@ class LoginPage extends ConsumerWidget {
                       const SizedBox(height: 24),
 
                       // Login Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: formState.isLoading
-                              ? null
-                              : () async {
-                                  final success = await ref
-                                      .read(loginFormProvider.notifier)
-                                      .login();
+                      // Login Button
+SizedBox(
+  width: double.infinity,
+  height: 56,
+  child: ElevatedButton(
+    onPressed: formState.isLoading
+        ? null
+        : () async {
+            final response = await ref
+                .read(loginFormProvider.notifier)
+                .login();
 
-                                  if (success && context.mounted) {
-                                    await ref
-                                        .read(authSessionProvider.notifier)
-                                        .login(
-                                          rememberMe: formState.rememberMe,
-                                        );
+            if (response != null && context.mounted) {
+              await ref
+                  .read(authSessionProvider.notifier)
+                  .login(
+                    rememberMe: formState.rememberMe,
+                    token: response.token,
+                    user: response.user,
+                  );
 
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => HomePage(),
-                                      ),
-                                    );
-                                  }
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF581C87),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: formState.isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                        ),
-                      ),
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => HomePage(),
+                ),
+              );
+            }
+          },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF581C87),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+    child: formState.isLoading
+        ? const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
+          )
+        : const Text(
+            'Sign In',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+  ),
+),
                       const SizedBox(height: 24),
 
                       // Sign Up Link
@@ -358,56 +361,7 @@ class LoginPage extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildPatternLine(double width, int colorHex) {
-    return Container(
-      width: width,
-      height: 4,
-      decoration: BoxDecoration(
-        color: Color(colorHex).withOpacity(0.3),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
 }
-
-// Custom clipper for the wave effect
-class WaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    var path = Path();
-    path.lineTo(0, size.height - 40);
-
-    var firstControlPoint = Offset(size.width / 4, size.height);
-    var firstEndPoint = Offset(size.width / 2, size.height - 20);
-
-    path.quadraticBezierTo(
-      firstControlPoint.dx,
-      firstControlPoint.dy,
-      firstEndPoint.dx,
-      firstEndPoint.dy,
-    );
-
-    var secondControlPoint = Offset(size.width * 3 / 4, size.height - 40);
-    var secondEndPoint = Offset(size.width, size.height - 20);
-
-    path.quadraticBezierTo(
-      secondControlPoint.dx,
-      secondControlPoint.dy,
-      secondEndPoint.dx,
-      secondEndPoint.dy,
-    );
-
-    path.lineTo(size.width, 0);
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
-
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
