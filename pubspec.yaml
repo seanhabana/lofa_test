@@ -46,11 +46,11 @@ dependencies:
 
 flutter_native_splash:
   color: "#F7F7FB"
-  image: assets/logo/logo_splash_horizontal1.png
+  image: assets/logo/logo_splash_2.png
 
   android_12:
     color: "#F7F7FB"
-    image: assets/logo/logo_splash_horizontal1.png
+    image: assets/logo/logo_splash_2.png
 
   android: true
   ios: true

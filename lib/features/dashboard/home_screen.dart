@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/navigation_provider.dart';
 import '../../shared/bottom_navbar.dart';
 import '../certificates/certificates_view.dart';
-import '../courses/courses_view.dart';
+import '../courses/courses_view.dart' ;
 import '../reports/reports_view.dart';
 import '../settings/settings_view.dart';
 import '../subscriptions/subscriptions_view.dart';

@@ -6,7 +6,6 @@ final darkModeProvider = StateProvider<bool>((ref) => false);
 final emailNotificationsProvider = StateProvider<bool>((ref) => true);
 final pushNotificationsProvider = StateProvider<bool>((ref) => true);
 final courseRemindersProvider = StateProvider<bool>((ref) => true);
-final languageProvider = StateProvider<String>((ref) => 'English');
 
 class PreferencesView extends ConsumerWidget {
   const PreferencesView({super.key});
@@ -17,7 +16,6 @@ class PreferencesView extends ConsumerWidget {
     final emailNotifications = ref.watch(emailNotificationsProvider);
     final pushNotifications = ref.watch(pushNotificationsProvider);
     final courseReminders = ref.watch(courseRemindersProvider);
-    final language = ref.watch(languageProvider);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -106,56 +104,10 @@ class PreferencesView extends ConsumerWidget {
                 ),
               ],
             ),
-            
+   
             const SizedBox(height: 16),
             
-            // Language & Region Section
-            _buildSection(
-              title: 'Language & Region',
-              icon: Icons.language,
-              children: [
-                _buildDropdownTile(
-                  title: 'Language',
-                  subtitle: 'Choose your preferred language',
-                  icon: Icons.translate,
-                  value: language,
-                  options: ['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese'],
-                  onChanged: (value) {
-                    ref.read(languageProvider.notifier).state = value!;
-                  },
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Privacy Section
-            _buildSection(
-              title: 'Privacy & Data',
-              icon: Icons.privacy_tip_outlined,
-              children: [
-                _buildActionTile(
-                  title: 'Data Collection',
-                  subtitle: 'Manage what data we collect',
-                  icon: Icons.data_usage,
-                  onTap: () {
-                    _showDataCollectionDialog(context);
-                  },
-                ),
-                const Divider(height: 1),
-                _buildActionTile(
-                  title: 'Clear Cache',
-                  subtitle: 'Free up storage space',
-                  icon: Icons.cleaning_services,
-                  onTap: () {
-                    _showClearCacheDialog(context, ref);
-                  },
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
+           
             // About Section
             _buildSection(
               title: 'About',

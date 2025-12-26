@@ -51,52 +51,54 @@ class _ContactViewState extends ConsumerState<ContactView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Get help and support',
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.black54,
+                fontSize: 13,
+                color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             
-            // Contact Information Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildContactCard(
+            // Contact Information - Compact
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  _buildCompactContactItem(
                     icon: Icons.email_outlined,
-                    title: 'Email',
-                    subtitle: 'support@ndislearning.com',
-                    color: Colors.blue,
+                    label: 'Email',
+                    value: 'support@lofaconsulting.com',
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildContactCard(
+                  const Divider(height: 20),
+                  _buildCompactContactItem(
                     icon: Icons.phone_outlined,
-                    title: 'Phone',
-                    subtitle: '+61 2 1234 5678',
-                    color: Colors.green,
+                    label: 'Phone',
+                    value: '+1 (234) 567-890',
                   ),
-                ),
-              ],
+                  const Divider(height: 20),
+                  _buildCompactContactItem(
+                    icon: Icons.location_on_outlined,
+                    label: 'Address',
+                    value: '123 Learning Street, Education City, EC 12345',
+                  ),
+                ],
+              ),
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             
             // Contact Form
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Form(
                 key: _formKey,
@@ -104,11 +106,11 @@ class _ContactViewState extends ConsumerState<ContactView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Padding(
-                      padding: EdgeInsets.all(20),
+                      padding: EdgeInsets.all(16),
                       child: Text(
                         'Send us a message',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
@@ -116,30 +118,22 @@ class _ContactViewState extends ConsumerState<ContactView> {
                     ),
                     const Divider(height: 1),
                     Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Name Field
-                          Text(
-                            'Name',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _nameController,
                             decoration: InputDecoration(
+                              labelText: 'Name',
                               hintText: 'Enter your name',
-                              prefixIcon: const Icon(Icons.person_outline),
+                              prefixIcon: const Icon(Icons.person_outline, size: 20),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              isDense: true,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -149,28 +143,20 @@ class _ContactViewState extends ConsumerState<ContactView> {
                             },
                           ),
                           
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           
                           // Email Field
-                          Text(
-                            'Email',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _emailController,
                             decoration: InputDecoration(
+                              labelText: 'Email',
                               hintText: 'Enter your email',
-                              prefixIcon: const Icon(Icons.email_outlined),
+                              prefixIcon: const Icon(Icons.email_outlined, size: 20),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              isDense: true,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -183,27 +169,19 @@ class _ContactViewState extends ConsumerState<ContactView> {
                             },
                           ),
                           
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           
                           // Topic Dropdown
-                          Text(
-                            'Topic',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             value: selectedTopic,
                             decoration: InputDecoration(
-                              prefixIcon: const Icon(Icons.topic_outlined),
+                              labelText: 'Topic',
+                              prefixIcon: const Icon(Icons.topic_outlined, size: 20),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              isDense: true,
                             ),
                             items: [
                               'General Inquiry',
@@ -215,7 +193,7 @@ class _ContactViewState extends ConsumerState<ContactView> {
                             ].map((topic) {
                               return DropdownMenuItem(
                                 value: topic,
-                                child: Text(topic),
+                                child: Text(topic, style: const TextStyle(fontSize: 14)),
                               );
                             }).toList(),
                             onChanged: (value) {
@@ -223,28 +201,20 @@ class _ContactViewState extends ConsumerState<ContactView> {
                             },
                           ),
                           
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           
                           // Message Field
-                          Text(
-                            'Message',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _messageController,
-                            maxLines: 6,
+                            maxLines: 5,
                             decoration: InputDecoration(
+                              labelText: 'Message',
                               hintText: 'Type your message here...',
+                              alignLabelWithHint: true,
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.all(12),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -257,7 +227,7 @@ class _ContactViewState extends ConsumerState<ContactView> {
                             },
                           ),
                           
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
                           
                           // Submit Button
                           SizedBox(
@@ -270,21 +240,21 @@ class _ContactViewState extends ConsumerState<ContactView> {
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF581C87),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               child: const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.send),
+                                  Icon(Icons.send, size: 18),
                                   SizedBox(width: 8),
                                   Text(
                                     'Send Message',
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
@@ -299,39 +269,78 @@ class _ContactViewState extends ConsumerState<ContactView> {
               ),
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             
-            // FAQ Section
+            // Support Resources Section
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        Icon(Icons.help_outline, color: Color(0xFF581C87)),
-                        SizedBox(width: 12),
-                        Text(
-                          'Frequently Asked Questions',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Support Resources',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  _buildQuickLinkItem(
+                    icon: Icons.help_center_outlined,
+                    title: 'Help Center',
+                    onTap: () {
+                      // TODO: Navigate to help center
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _buildQuickLinkItem(
+                    icon: Icons.forum_outlined,
+                    title: 'Community Forum',
+                    onTap: () {
+                      // TODO: Navigate to community forum
+                    },
+                  ),
+                  const Divider(height: 1),
+                  _buildQuickLinkItem(
+                    icon: Icons.bug_report_outlined,
+                    title: 'Technical Issues',
+                    onTap: () {
+                      // TODO: Navigate to technical issues
+                    },
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // FAQ Section
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Frequently Asked Questions',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                   const Divider(height: 1),
@@ -353,61 +362,75 @@ class _ContactViewState extends ConsumerState<ContactView> {
               ),
             ),
             
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContactCard({
+  Widget _buildCompactContactItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF581C87)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickLinkItem({
     required IconData icon,
     required String title,
-    required String subtitle,
-    required Color color,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF581C87)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
             ),
-            child: Icon(icon, size: 28, color: color),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
+            Icon(Icons.chevron_right, size: 20, color: Colors.grey[400]),
+          ],
+        ),
       ),
     );
   }
@@ -417,17 +440,18 @@ class _ContactViewState extends ConsumerState<ContactView> {
     required String answer,
   }) {
     return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       title: Text(
         question,
         style: const TextStyle(
           fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
           color: Colors.black87,
         ),
       ),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Text(
             answer,
             style: TextStyle(
