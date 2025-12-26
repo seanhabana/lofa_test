@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/course_provider.dart';
+import '../../shared/navigation_utils.dart';
+import '../../shared/plan_badge.dart';
 
 class CoursesView extends ConsumerStatefulWidget {
   const CoursesView({super.key});
@@ -10,10 +12,18 @@ class CoursesView extends ConsumerStatefulWidget {
 }
 
 class _CoursesViewState extends ConsumerState<CoursesView> {
-  String selectedCategory = 'All';
-  final categories = ['All', 'Latest', 'Free', 'Core', 'Pro', 'Elite'];
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showFilters = false;
+  String _selectedPlanFilter = 'All';
+  String _sortBy = 'default'; // default, rating, duration
+
+  final planFilters = ['All', 'Free', 'Core', 'Pro', 'Elite'];
+  final sortOptions = [
+    {'value': 'default', 'label': 'Default'},
+    {'value': 'rating', 'label': 'Highest Rated'},
+    {'value': 'duration', 'label': 'Duration'},
+  ];
 
   @override
   void dispose() {
@@ -21,14 +31,37 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
     super.dispose();
   }
 
-  List<Course> _filterCourses(List<Course> courses) {
-    if (_searchQuery.isEmpty) return courses;
+  List<Course> _filterAndSortCourses(List<Course> courses) {
+    var filtered = courses;
     
-    return courses.where((course) {
-      final titleMatch = course.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final descMatch = course.description.toLowerCase().contains(_searchQuery.toLowerCase());
-      return titleMatch || descMatch;
-    }).toList();
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((course) {
+        final titleMatch = course.title.toLowerCase().contains(_searchQuery.toLowerCase());
+        final descMatch = course.description.toLowerCase().contains(_searchQuery.toLowerCase());
+        return titleMatch || descMatch;
+      }).toList();
+    }
+    
+    // Apply plan filter
+    if (_selectedPlanFilter != 'All') {
+      filtered = filtered.where((course) => 
+        course.plan.toLowerCase() == _selectedPlanFilter.toLowerCase()
+      ).toList();
+    }
+    
+    // Apply sorting
+    if (_sortBy == 'rating') {
+      filtered.sort((a, b) => b.rating.compareTo(a.rating));
+    } else if (_sortBy == 'duration') {
+      filtered.sort((a, b) {
+        final aDuration = int.parse(a.durationHours.replaceAll(RegExp(r'[^0-9]'), ''));
+        final bDuration = int.parse(b.durationHours.replaceAll(RegExp(r'[^0-9]'), ''));
+        return aDuration.compareTo(bDuration);
+      });
+    }
+    
+    return filtered;
   }
 
   @override
@@ -54,58 +87,73 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
   }
 
   Widget _buildCoursesContent(BuildContext context, CoursesState state) {
+    // Combine all courses for filtering
+    final allCourses = [
+      ...state.latestCourses,
+      ...state.freeCourses,
+      ...state.corePlanCourses,
+      ...state.proPlanCourses,
+      ...state.elitePlanCourses,
+    ].toSet().toList();
+
+    // Group courses by category
+    final coursesByCategory = <String, List<Course>>{};
+    for (var course in allCourses) {
+      if (!coursesByCategory.containsKey(course.category)) {
+        coursesByCategory[course.category] = [];
+      }
+      coursesByCategory[course.category]!.add(course);
+    }
+
+    // Category display names
+    final categoryNames = {
+      'support-strategies': 'Support Strategies',
+      'communication': 'Communication Skills',
+      'assistive-technology': 'Assistive Technology',
+      'ndis-processes': 'NDIS Processes & Planning',
+      'person-centered-care': 'Person-Centered Care',
+      'daily-living': 'Daily Living Support',
+      'behavioural-support': 'Behavioural Support',
+      'crisis-management': 'Crisis Management',
+      'family-carer': 'Family & Carer Support',
+      'inclusive-practices': 'Inclusive Practices',
+      'professional-development': 'Professional Development',
+      'rights-advocacy': 'Rights & Advocacy',
+    };
+
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
           _buildSearchBar(),
-          _buildCategoryTabs(),
+          if (_showFilters) _buildFilterSection(),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (selectedCategory == 'All' || selectedCategory == 'Latest')
-                    _buildSection(
-                      title: 'Latest Courses',
-                      courses: _filterCourses(state.latestCourses),
-                      showBadge: true,
-                      badgeText: 'NEW',
-                      badgeColor: const Color(0xFF581C87),
-                    ),
-                  if (selectedCategory == 'All' || selectedCategory == 'Free')
-                    _buildSection(
-                      title: 'Free Courses',
-                      courses: _filterCourses(state.freeCourses),
-                      showBadge: true,
-                      badgeText: 'FREE',
-                      badgeColor: Colors.green,
-                    ),
-                  if (selectedCategory == 'All' || selectedCategory == 'Core')
-                    _buildSection(
-                      title: 'Core Plan Courses',
-                      courses: _filterCourses(state.corePlanCourses),
-                      showBadge: true,
-                      badgeText: 'CORE',
-                      badgeColor: const Color(0xFF9D65AA),
-                    ),
-                  if (selectedCategory == 'All' || selectedCategory == 'Pro')
-                    _buildSection(
-                      title: 'Pro Plan Courses',
-                      courses: _filterCourses(state.proPlanCourses),
-                      showBadge: true,
-                      badgeText: 'PRO',
-                      badgeColor: const Color(0xFF581C87),
-                    ),
-                  if (selectedCategory == 'All' || selectedCategory == 'Elite')
-                    _buildSection(
-                      title: 'Elite Plan Courses',
-                      courses: _filterCourses(state.elitePlanCourses),
-                      showBadge: true,
-                      badgeText: 'ELITE',
-                      badgeColor: Colors.amber.shade700,
-                    ),
+                  // Latest Courses Section
+                  _buildSection(
+                    title: 'Latest Courses',
+                    courses: _filterAndSortCourses(state.latestCourses),
+                    showBadge: true,
+                    badgeText: 'NEW',
+                    badgeColor: const Color(0xFF581C87),
+                  ),
+                  
+                  // Category-based Sections
+                  ...coursesByCategory.entries.map((entry) {
+                    final categoryKey = entry.key;
+                    final categoryCourses = entry.value;
+                    final categoryName = categoryNames[categoryKey] ?? categoryKey;
+                    
+                    return _buildSection(
+                      title: categoryName,
+                      courses: _filterAndSortCourses(categoryCourses),
+                    );
+                  }).toList(),
+                  
                   const SizedBox(height: 24),
                 ],
               ),
@@ -148,72 +196,161 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.grey[300]!),
       ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-        decoration: InputDecoration(
-          hintText: 'Search courses...',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey[600]),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _searchQuery = '';
-                    });
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search courses...',
+                hintStyle: TextStyle(color: Colors.grey[500]),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear, color: Colors.grey[600]),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: _showFilters ? const Color(0xFF581C87) : Colors.grey[200],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.tune,
+                color: _showFilters ? Colors.white : Colors.grey[700],
+              ),
+              onPressed: () {
+                setState(() {
+                  _showFilters = !_showFilters;
+                });
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryTabs() {
+  Widget _buildFilterSection() {
     return Container(
-      height: 50,
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          final isSelected = selectedCategory == category;
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                selectedCategory = category;
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF581C87) : Colors.grey[200],
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: Center(
-                child: Text(
-                  category,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : Colors.grey[700],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[200]!),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Plan Filter
+          Text(
+            'Plan Type',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: planFilters.map((plan) {
+              final isSelected = _selectedPlanFilter == plan;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedPlanFilter = plan;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF581C87) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF581C87) : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(
+                    plan,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                    ),
                   ),
                 ),
-              ),
+              );
+            }).toList(),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Sort By
+          Text(
+            'Sort By',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: sortOptions.map((option) {
+              final value = option['value'] as String;
+              final label = option['label'] as String;
+              final isSelected = _sortBy == value;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _sortBy = value;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF581C87) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF581C87) : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -249,6 +386,7 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
           itemCount: courses.length,
           itemBuilder: (context, index) {
             return _buildCourseCard(
+              context,
               courses[index],
               showBadge: showBadge,
               badgeText: badgeText,
@@ -262,449 +400,163 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
   }
 
   Widget _buildCourseCard(
+    BuildContext context,
     Course course, {
     bool showBadge = false,
     String? badgeText,
     Color? badgeColor,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Stack(
-              children: [
-                Container(
-                  width: 120,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                    ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.play_circle_outline,
-                      size: 40,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                if (showBadge && badgeText != null)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: badgeColor ?? const Color(0xFF581C87),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        badgeText,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      course.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      course.description,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.star, size: 14, color: Colors.amber[700]),
-                        const SizedBox(width: 4),
-                        Text(
-                          course.rating.toString(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          course.durationHours,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.menu_book,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${course.totalLessons} lessons',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+    return CourseCardWrapper(
+      courseId: course.id,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: 120,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_outline,
+                        size: 40,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  if (showBadge && badgeText != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor ?? const Color(0xFF581C87),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              course.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          PlanBadgeCompact(plan: course.plan),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        course.description,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.star, size: 14, color: Colors.amber[700]),
+                          const SizedBox(width: 4),
+                          Text(
+                            course.rating.toString(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            course.durationHours,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.menu_book,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${course.totalLessons} lessons',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-// Add this to your course_provider.dart file
-class CoursesState {
-  final List<Course> latestCourses;
-  final List<Course> freeCourses;
-  final List<Course> corePlanCourses;
-  final List<Course> proPlanCourses;
-  final List<Course> elitePlanCourses;
-
-  CoursesState({
-    required this.latestCourses,
-    required this.freeCourses,
-    required this.corePlanCourses,
-    required this.proPlanCourses,
-    required this.elitePlanCourses,
-  });
-}
-
-class CoursesViewModel extends StateNotifier<AsyncValue<CoursesState>> {
-  CoursesViewModel() : super(const AsyncValue.loading()) {
-    loadData();
-  }
-
-  Future<void> loadData() async {
-    state = const AsyncValue.loading();
-
-    try {
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final coursesState = CoursesState(
-        latestCourses: _getLatestCourses(),
-        freeCourses: _getFreeCourses(),
-        corePlanCourses: _getCorePlanCourses(),
-        proPlanCourses: _getProPlanCourses(),
-        elitePlanCourses: _getElitePlanCourses(),
-      );
-
-      state = AsyncValue.data(coursesState);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
-    }
-  }
-
-  List<Course> _getLatestCourses() {
-    return [
-      Course(
-        id: 'latest1',
-        title: 'Modern Web Development with Next.js 14',
-        description:
-            'Build full-stack applications with the latest Next.js features including server components and app router.',
-        durationHours: '18 hrs',
-        totalLessons: 65,
-        completedLessons: 0,
-        progress: 0.0,
-        price: 3500,
-        plan: 'free',
-
-        rating: 4.9,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'latest2',
-        title: 'AI and Machine Learning Fundamentals',
-        description:
-            'Introduction to artificial intelligence, neural networks, and practical ML applications.',
-        durationHours: '20 hrs',
-        totalLessons: 72,
-        completedLessons: 0,
-        progress: 0.0,
-        price: 4200,
-        plan: 'core',
-
-        rating: 4.8,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'latest3',
-        title: 'Cybersecurity Essentials for Developers',
-        description:
-            'Learn security best practices, encryption, authentication, and how to protect applications.',
-        durationHours: '12 hrs',
-        totalLessons: 45,
-        completedLessons: 0,
-        progress: 0.0,
-        price: 3000,
-        plan: 'pro',
-
-        rating: 4.7,
-        imageUrl: '',
-      ),
-    ];
-  }
-
-  List<Course> _getFreeCourses() {
-    return [
-      Course(
-        id: 'free1',
-        title: 'Introduction to Programming',
-        description:
-            'Start your coding journey with basic programming concepts and problem-solving.',
-        durationHours: '8 hrs',
-        totalLessons: 30,
-        completedLessons: 0,
-        plan: 'free',
-
-        progress: 0.0,
-        price: 0,
-        rating: 4.5,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'free2',
-        title: 'Git Version Control Basics',
-        description:
-            'Master the fundamentals of Git for tracking code changes and collaborating.',
-        durationHours: '4 hrs',
-        totalLessons: 15,
-        completedLessons: 0,
-        plan: 'free',
-
-        progress: 0.0,
-        price: 0,
-        rating: 4.6,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'free3',
-        title: 'HTML & CSS Crash Course',
-        description:
-            'Build beautiful websites from scratch using HTML5 and CSS3.',
-        durationHours: '6 hrs',
-        totalLessons: 25,
-        completedLessons: 0,
-        plan: 'free',
-
-        progress: 0.0,
-        price: 0,
-        rating: 4.7,
-        imageUrl: '',
-      ),
-    ];
-  }
-
-  List<Course> _getCorePlanCourses() {
-    return [
-      Course(
-        id: 'core1',
-        title: 'JavaScript Fundamentals',
-        description:
-            'Master JavaScript from basics to advanced concepts including ES6+ features.',
-        durationHours: '15 hrs',
-        totalLessons: 55,
-        completedLessons: 0,
-        progress: 0.0,
-        price: 2200,
-        plan: 'core',
-
-        rating: 4.7,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'core2',
-        title: 'React.js Complete Guide',
-        description:
-            'Build modern web applications with React, hooks, context, and state management.',
-        durationHours: '16 hrs',
-        totalLessons: 60,
-        completedLessons: 0,
-        plan: 'core',
-
-        progress: 0.0,
-        price: 2500,
-        rating: 4.8,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'core3',
-        title: 'Node.js Backend Development',
-        description:
-            'Create scalable backend APIs with Node.js, Express, and MongoDB.',
-        durationHours: '14 hrs',
-        totalLessons: 50,
-        completedLessons: 0,
-        progress: 0.0,
-        plan: 'core',
-
-        price: 2400,
-        rating: 4.6,
-        imageUrl: '',
-      ),
-    ];
-  }
-
-  List<Course> _getProPlanCourses() {
-    return [
-      Course(
-        id: 'pro1',
-        title: 'Advanced Flutter & Dart Mastery',
-        description:
-            'Deep dive into Flutter animations, custom widgets, and performance optimization.',
-        durationHours: '22 hrs',
-        totalLessons: 85,
-        completedLessons: 0,
-        progress: 0.0,
-        plan: 'pro',
-
-        price: 3800,
-        rating: 4.9,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'pro2',
-        title: 'AWS Cloud Architecture',
-        description:
-            'Design and deploy scalable cloud solutions using AWS services and best practices.',
-        durationHours: '20 hrs',
-        totalLessons: 75,
-        completedLessons: 0,
-        plan: 'pro',
-
-        progress: 0.0,
-        price: 4000,
-        rating: 4.8,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'pro3',
-        title: 'Microservices with Docker & Kubernetes',
-        description:
-            'Build, containerize, and orchestrate microservices architecture.',
-        durationHours: '18 hrs',
-        totalLessons: 68,
-        completedLessons: 0,
-        plan: 'pro',
-
-        progress: 0.0,
-        price: 3600,
-        rating: 4.7,
-        imageUrl: '',
-      ),
-    ];
-  }
-
-  List<Course> _getElitePlanCourses() {
-    return [
-      Course(
-        id: 'elite1',
-        title: 'System Design & Architecture Masterclass',
-        description:
-            'Design large-scale distributed systems with real-world case studies and patterns.',
-        durationHours: '25 hrs',
-        totalLessons: 95,
-        completedLessons: 0,
-        progress: 0.0,
-        plan: 'elite',
-
-        price: 5500,
-        rating: 5.0,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'elite2',
-        title: 'Advanced Data Structures & Algorithms',
-        description:
-            'Master complex algorithms and data structures for technical interviews and optimization.',
-        durationHours: '30 hrs',
-        totalLessons: 110,
-        completedLessons: 0,
-        progress: 0.0,
-        price: 6000,
-        plan: 'elite',
-
-        rating: 4.9,
-        imageUrl: '',
-      ),
-      Course(
-        id: 'elite3',
-        title: 'Full-Stack Blockchain Development',
-        description:
-            'Build decentralized applications with Solidity, Web3.js, and smart contracts.',
-        durationHours: '28 hrs',
-        totalLessons: 100,
-        completedLessons: 0,
-        plan: 'elite',
-
-        progress: 0.0,
-        price: 5800,
-        rating: 4.8,
-        imageUrl: '',
-      ),
-    ];
-  }
-}
-
-final coursesViewModelProvider =
-    StateNotifierProvider<CoursesViewModel, AsyncValue<CoursesState>>((ref) {
-      return CoursesViewModel();
-    });

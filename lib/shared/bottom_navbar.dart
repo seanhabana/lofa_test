@@ -31,20 +31,16 @@ class AppBottomNavBar extends ConsumerWidget {
           activeIcon: Icon(Icons.school),
           label: 'Courses',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.card_membership_outlined),
-          activeIcon: Icon(Icons.card_membership),
-          label: 'Subscription',
-        ),
+
         BottomNavigationBarItem(
           icon: Icon(Icons.bar_chart_outlined),
           activeIcon: Icon(Icons.bar_chart),
           label: 'Reports',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Account',
+          icon: Icon(Icons.settings_outlined),
+          activeIcon: Icon(Icons.settings),
+          label: 'Settings',
         ),
       ],
     );

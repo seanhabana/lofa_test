@@ -55,56 +55,76 @@ class CourseDetailView extends ConsumerWidget {
   }
 
   Widget _buildAppBar(BuildContext context, Course course) {
-    return SliverAppBar(
-      expandedHeight: 200,
-      pinned: true,
-      backgroundColor: const Color(0xFF581C87),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-        title: Text(
-          course.title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+  return SliverAppBar(
+    expandedHeight: 200,
+    pinned: true,
+    backgroundColor: const Color(0xFF581C87),
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back, color: Colors.white),
+      onPressed: () => Navigator.pop(context),
+    ),
+
+    /// ❌ Prevent default big Material spacing
+    titleSpacing: 0,
+
+    flexibleSpace: LayoutBuilder(
+      builder: (context, constraints) {
+        final isCollapsed =
+            constraints.biggest.height <= kToolbarHeight + 10;
+
+        return FlexibleSpaceBar(
+          centerTitle: false,
+
+          /// 🔥 Dynamic padding
+          titlePadding: EdgeInsets.only(
+            left: isCollapsed ? 56 : 16, // back button width ≈ 56
+            right: 16,
+            bottom: 16,
           ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(
-                  Icons.play_circle_outline,
-                  size: 80,
-                  color: Colors.grey,
+
+          title: Text(
+            course.title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          background: Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(
+                    Icons.play_circle_outline,
+                    size: 80,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    const Color(0xFF581C87).withOpacity(0.8),
-                  ],
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      const Color(0xFF581C87).withOpacity(0.8),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
 
   Widget _buildCourseInfo(CourseDetail courseDetail) {
     final course = courseDetail.course;

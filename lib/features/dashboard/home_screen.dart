@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/navigation_provider.dart';
 import '../../shared/bottom_navbar.dart';
-import '../account/accounts_view.dart';
 import '../certificates/certificates_view.dart';
 import '../courses/courses_view.dart';
 import '../reports/reports_view.dart';
+import '../settings/settings_view.dart';
 import '../subscriptions/subscriptions_view.dart';
 import 'home_view.dart';
 
@@ -23,9 +23,8 @@ class HomePage extends ConsumerWidget {
         children: const [
           HomeView(),
           CoursesView(),
-          SubscriptionView(),
           ReportsView(),
-          AccountView(),
+          SettingsView(),
         ],
       ),
       bottomNavigationBar: const AppBottomNavBar(),

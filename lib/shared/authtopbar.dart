@@ -139,7 +139,7 @@ class WaveClipper extends CustomClipper<Path> {
 
     // Second wave
     final secondControlPoint =
-        Offset(size.width * 3 / 4, size.height - 60);
+        Offset(size.width * 3 / 4, size.height - 70);
     final secondEndPoint =
         Offset(size.width, size.height - 30);
 
