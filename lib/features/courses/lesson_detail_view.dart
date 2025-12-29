@@ -5,6 +5,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/lesson_models.dart';
 import '../../models/course_models.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/auth_session_provider.dart';
+import '../../services/course_service.dart';
 import '../../shared/navigation_utils.dart';
 
 class LessonDetailView extends ConsumerStatefulWidget {
@@ -24,7 +26,12 @@ class LessonDetailView extends ConsumerStatefulWidget {
 class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
   WebViewController? _webViewController;
   bool _isVideoLoading = true;
+  bool _isMarkingComplete = false;
   double _videoAspectRatio = 16 / 9;
+  int _currentPositionSeconds = 0;
+  int _totalWatchTimeSeconds = 0;
+  DateTime? _lastUpdateTime;
+  int? _videoDurationSeconds; // Store video duration
 
   @override
   void initState() {
@@ -35,10 +42,121 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    
+    // Start periodic progress updates
+    _startProgressTracking();
+  }
+
+  void _startProgressTracking() {
+    // Update progress every 10 seconds while watching
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted) {
+        _updateProgress();
+        _startProgressTracking();
+      }
+    });
+  }
+
+  Future<void> _updateProgress() async {
+    final authState = ref.read(authSessionProvider);
+    final token = authState.token;
+    
+    if (token == null) return;
+
+    final now = DateTime.now();
+    if (_lastUpdateTime != null) {
+      final elapsed = now.difference(_lastUpdateTime!).inSeconds;
+      _totalWatchTimeSeconds += elapsed;
+    }
+    _lastUpdateTime = now;
+
+    // Calculate progress percentage based on actual video duration
+    double progressPercentage = 0.0;
+    if (_videoDurationSeconds != null && _videoDurationSeconds! > 0) {
+      // Use current position if available, otherwise use total watch time
+      final progressTime = _currentPositionSeconds > 0 
+          ? _currentPositionSeconds 
+          : _totalWatchTimeSeconds;
+      
+      progressPercentage = (progressTime / _videoDurationSeconds!) * 100;
+      progressPercentage = progressPercentage.clamp(0.0, 100.0);
+      
+      print('📊 Progress update: ${progressPercentage.toStringAsFixed(1)}% (${progressTime}s / ${_videoDurationSeconds}s)');
+    } else {
+      print('⏳ Waiting for video duration... (watched: ${_totalWatchTimeSeconds}s)');
+      return; // Don't send progress until we have duration
+    }
+
+    // Update progress without marking as completed
+    await CourseService.updateLessonProgress(
+      lessonId: widget.lessonId,
+      token: token,
+      watchTimeSeconds: _totalWatchTimeSeconds,
+      lastPositionSeconds: _currentPositionSeconds,
+      progressPercentage: progressPercentage,
+      completed: false,
+    );
+  }
+
+  Future<void> _markLessonComplete() async {
+    if (_isMarkingComplete) return;
+    
+    setState(() {
+      _isMarkingComplete = true;
+    });
+
+    final authState = ref.read(authSessionProvider);
+    final token = authState.token;
+    
+    if (token == null) {
+      setState(() {
+        _isMarkingComplete = false;
+      });
+      return;
+    }
+
+    try {
+      // Mark lesson as completed
+      final success = await CourseService.markLessonCompleted(
+        lessonId: widget.lessonId,
+        token: token,
+      );
+
+      if (success && mounted) {
+        // Refresh course details to update UI
+        ref.invalidate(courseDetailProvider(widget.courseId));
+        
+        // Show completion message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Lesson completed! 🎉'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error marking lesson complete: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMarkingComplete = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    // Final progress update before leaving
+    _updateProgress();
+    
     // Reset to portrait only when leaving
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -67,6 +185,9 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
               ),
             );
           }
+          
+          // Wait for actual video duration from the player before sending progress updates
+          
           return _buildContent(context, lesson, courseDetail);
         },
         loading: () => const Center(
@@ -108,14 +229,29 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
-          expandedHeight: 190 + topPadding,
+          expandedHeight: 185 + topPadding,
           pinned: true,
           backgroundColor: const Color(0xFF0A1929),
           leading: Padding(
-            padding: EdgeInsets.only(top: 0),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+            padding: const EdgeInsets.only(top: 0),
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+                padding: EdgeInsets.zero,
+              ),
             ),
           ),
           flexibleSpace: FlexibleSpaceBar(
@@ -226,7 +362,17 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
   void _initializeWebView(String embedUrl) {
     print('🎥 Initializing WebView for: $embedUrl');
 
-    // Create HTML wrapper for the iframe with native fullscreen support
+    // Detect video platform
+    final isYouTube = embedUrl.contains('youtube.com') || embedUrl.contains('youtu.be');
+    final isVimeo = embedUrl.contains('vimeo.com');
+
+    // Add API parameters to enable player APIs
+    String apiEnabledUrl = embedUrl;
+    if (isYouTube) {
+      apiEnabledUrl += (embedUrl.contains('?') ? '&' : '?') + 'enablejsapi=1';
+    }
+
+    // Create HTML wrapper for the iframe with video tracking
     final html = '''
 <!DOCTYPE html>
 <html>
@@ -256,13 +402,87 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
 </head>
 <body>
   <iframe 
-    src="$embedUrl" 
+    id="videoPlayer"
+    src="$apiEnabledUrl" 
     loading="eager" 
     allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;" 
     allowfullscreen="true"
     webkitallowfullscreen="true"
     mozallowfullscreen="true">
   </iframe>
+  
+  <script>
+    var videoDuration = null;
+    var currentTime = 0;
+    
+    // Listen for video events from YouTube/Vimeo
+    window.addEventListener('message', function(event) {
+      try {
+        var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        // YouTube Player API
+        if (data.event === 'infoDelivery' && data.info && data.info.duration) {
+          // Got duration from YouTube
+          videoDuration = Math.round(data.info.duration);
+          window.FlutterChannel.postMessage('DURATION:' + videoDuration);
+        }
+        
+        if (data.event === 'infoDelivery' && data.info && data.info.currentTime) {
+          // Got current time from YouTube
+          currentTime = Math.round(data.info.currentTime);
+          window.FlutterChannel.postMessage('POSITION:' + currentTime);
+        }
+        
+        if (data.event === 'onStateChange' && data.info === 0) {
+          // Video ended (state 0)
+          window.FlutterChannel.postMessage('VIDEO_ENDED');
+        }
+        
+        // Vimeo Player API
+        if (data.event === 'ready') {
+          // Request duration from Vimeo
+          var iframe = document.getElementById('videoPlayer');
+          iframe.contentWindow.postMessage('{"method":"getDuration"}', '*');
+        }
+        
+        if (data.method === 'getDuration') {
+          videoDuration = Math.round(data.value);
+          window.FlutterChannel.postMessage('DURATION:' + videoDuration);
+        }
+        
+        if (data.event === 'timeupdate') {
+          currentTime = Math.round(data.data.seconds);
+          window.FlutterChannel.postMessage('POSITION:' + currentTime);
+        }
+        
+        if (data.event === 'ended') {
+          window.FlutterChannel.postMessage('VIDEO_ENDED');
+        }
+      } catch (e) {
+        // Not a video event, ignore
+      }
+    });
+    
+    // Request info from YouTube periodically
+    ${isYouTube ? '''
+    setInterval(function() {
+      var iframe = document.getElementById('videoPlayer');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}', '*');
+      }
+    }, 1000);
+    ''' : ''}
+    
+    // Request info from Vimeo periodically
+    ${isVimeo ? '''
+    setInterval(function() {
+      var iframe = document.getElementById('videoPlayer');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage('{"method":"getCurrentTime"}', '*');
+      }
+    }, 1000);
+    ''' : ''}
+  </script>
 </body>
 </html>
 ''';
@@ -270,10 +490,37 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
+      ..addJavaScriptChannel(
+        'FlutterChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          final msg = message.message;
+          
+          if (msg.startsWith('DURATION:')) {
+            // Got actual video duration
+            final duration = int.tryParse(msg.substring(9));
+            if (duration != null && duration > 0) {
+              print('🎥 Video duration detected: ${duration}s');
+              setState(() {
+                _videoDurationSeconds = duration;
+              });
+            }
+          } else if (msg.startsWith('POSITION:')) {
+            // Got current playback position
+            final position = int.tryParse(msg.substring(9));
+            if (position != null) {
+              _currentPositionSeconds = position;
+            }
+          } else if (msg == 'VIDEO_ENDED') {
+            print('🎬 Video ended - marking lesson as complete');
+            _markLessonComplete();
+          }
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
             print('📺 Page started loading: $url');
+            _lastUpdateTime = DateTime.now();
           },
           onPageFinished: (String url) {
             print('✅ Page finished loading: $url');
@@ -442,17 +689,6 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
                 const SizedBox(height: 12),
                 _buildInfoRow(Icons.signal_cellular_alt, 'Difficulty', lesson.difficulty),
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            lesson.content.isNotEmpty
-                ? lesson.content
-                : 'Watch the video above to learn more about ${lesson.title.toLowerCase()}.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[700],
-              height: 1.6,
             ),
           ),
         ],

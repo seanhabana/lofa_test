@@ -163,46 +163,45 @@ class CourseService {
     }
   }
 
-static Future<bool> enrollInCourse(int courseId, String token) async {
-  try {
-    print('🔵 Starting enrollment for course ID: $courseId');
+  static Future<bool> enrollInCourse(int courseId, String token) async {
+    try {
+      print('🔵 Starting enrollment for course ID: $courseId');
 
-    final response = await ApiService.post(
-      '/courses/$courseId/enroll',
-      body: {}, // no body needed unless backend requires it
-      token: token,
-    );
+      final response = await ApiService.post(
+        '/courses/$courseId/enroll',
+        body: {}, // no body needed unless backend requires it
+        token: token,
+      );
 
-    print('📡 Enroll response status: ${response.statusCode}');
-    print('📡 Enroll response body: ${response.body}');
+      print('📡 Enroll response status: ${response.statusCode}');
+      print('📡 Enroll response body: ${response.body}');
 
-    return response.statusCode == 200 || response.statusCode == 201;
-  } catch (e, stackTrace) {
-    print('❌ Enrollment error: $e');
-    print('Stack trace: $stackTrace');
-    return false;
-  }
-}
-
-static Future<bool> checkEnrollmentStatus(int courseId, String token) async {
-  try {
-    final response = await ApiService.get(
-      '/courses/$courseId/enrollment',
-      token: token,
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['is_enrolled'] == true;
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e, stackTrace) {
+      print('❌ Enrollment error: $e');
+      print('Stack trace: $stackTrace');
+      return false;
     }
-
-    return false;
-  } catch (e) {
-    print('❌ Error checking enrollment status: $e');
-    return false;
   }
-}
 
+  static Future<bool> checkEnrollmentStatus(int courseId, String token) async {
+    try {
+      final response = await ApiService.get(
+        '/courses/$courseId/enrollment',
+        token: token,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['is_enrolled'] == true;
+      }
+
+      return false;
+    } catch (e) {
+      print('❌ Error checking enrollment status: $e');
+      return false;
+    }
+  }
 
   // ==================== LESSON METHODS ====================
 
@@ -212,6 +211,7 @@ static Future<bool> checkEnrollmentStatus(int courseId, String token) async {
     required String token,
     required int watchTimeSeconds,
     required int lastPositionSeconds,
+    required double progressPercentage,
     required bool completed,
   }) async {
     try {
@@ -220,58 +220,67 @@ static Future<bool> checkEnrollmentStatus(int courseId, String token) async {
         body: {
           'watch_time_seconds': watchTimeSeconds,
           'last_position_seconds': lastPositionSeconds,
+          'progress_percentage': progressPercentage.round(), // Send as integer
           'completed': completed,
         },
         token: token,
       );
       
-      return response.statusCode == 200 || response.statusCode == 201;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Progress updated: ${progressPercentage.toStringAsFixed(1)}%');
+        return true;
+      } else {
+        print('⚠️ Failed to update progress: ${response.statusCode} - ${response.body}');
+        return false;
+      }
     } catch (e) {
       print('❌ Error updating lesson progress: $e');
       return false;
     }
   }
-static Future<CourseReviewsData> getCourseReviews(int courseId, {String? token}) async {
-  try {
-    print('🔍 Fetching course reviews from /courses/$courseId/reviews');
-    final response = await ApiService.get(
-      '/courses/$courseId/reviews',
-      token: token, // Pass the token if available
-    );
-    
-    print('📡 Course reviews response status: ${response.statusCode}');
-    print('📡 Course reviews response body: ${response.body}');
-    
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return CourseReviewsData.fromJson(data);
-    } else if (response.statusCode == 404) {
-      // Course has no reviews yet
-      print('⚠️ No reviews found for course $courseId');
-      return CourseReviewsData(
-        reviews: [],
-        totalReviews: 0,
-        averageRating: 0.0,
+
+  static Future<CourseReviewsData> getCourseReviews(int courseId, {String? token}) async {
+    try {
+      print('🔍 Fetching course reviews from /courses/$courseId/reviews');
+      final response = await ApiService.get(
+        '/courses/$courseId/reviews',
+        token: token, // Pass the token if available
       );
-    } else {
-      print('⚠️ Failed to load course reviews: ${response.statusCode}');
+      
+      print('📡 Course reviews response status: ${response.statusCode}');
+      print('📡 Course reviews response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return CourseReviewsData.fromJson(data);
+      } else if (response.statusCode == 404) {
+        // Course has no reviews yet
+        print('⚠️ No reviews found for course $courseId');
+        return CourseReviewsData(
+          reviews: [],
+          totalReviews: 0,
+          averageRating: 0.0,
+        );
+      } else {
+        print('⚠️ Failed to load course reviews: ${response.statusCode}');
+        return CourseReviewsData(
+          reviews: [],
+          totalReviews: 0,
+          averageRating: 0.0,
+        );
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error fetching course reviews: $e');
+      print('Stack trace: $stackTrace');
+      // Return empty reviews data on error instead of throwing
       return CourseReviewsData(
         reviews: [],
         totalReviews: 0,
         averageRating: 0.0,
       );
     }
-  } catch (e, stackTrace) {
-    print('❌ Error fetching course reviews: $e');
-    print('Stack trace: $stackTrace');
-    // Return empty reviews data on error instead of throwing
-    return CourseReviewsData(
-      reviews: [],
-      totalReviews: 0,
-      averageRating: 0.0,
-    );
   }
-}
+
   // Mark lesson as completed
   static Future<bool> markLessonCompleted({
     required int lessonId,
@@ -284,11 +293,16 @@ static Future<CourseReviewsData> getCourseReviews(int courseId, {String? token})
         token: token,
       );
       
-      return response.statusCode == 200 || response.statusCode == 201;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Lesson marked as completed');
+        return true;
+      } else {
+        print('⚠️ Failed to mark lesson complete: ${response.statusCode} - ${response.body}');
+        return false;
+      }
     } catch (e) {
       print('❌ Error marking lesson completed: $e');
       return false;
     }
   }
 }
-
