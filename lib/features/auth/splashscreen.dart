@@ -8,51 +8,36 @@ import '../dashboard/home_screen.dart';
 import './loginpage.dart';
 import '../../providers/auth_session_provider.dart';
 
-class SplashScreen extends ConsumerStatefulWidget {
+class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authSessionProvider);
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
+    ref.listen(authSessionProvider, (prev, next) {
+      if (!next.isLoading) {
+        debugPrint('🧭 Splash decision: loggedIn=${next.isLoggedIn}');
 
-    WidgetsBinding.instance.allowFirstFrame();
-
-    Future.delayed(const Duration(milliseconds: 3000), () {
-      if (!mounted) return;
-
-      final auth = ref.read(authSessionProvider);
-
-      if (auth.isLoggedIn) {
-        // ✅ Remembered user → Home
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomePage()),
-        );
-      } else {
-        // ❌ Not logged in → Onboarding or Login
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const OnboardingPage()),
-        );
+        if (next.isLoggedIn) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomePage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const OnboardingPage()),
+          );
+        }
       }
     });
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
       body: Stack(
         children: [
-          Center(
-            child: AnimatedLogo(),
-          ),
-
+          Center(child: AnimatedLogo()),
           const Positioned(
             bottom: 48,
             left: 0,

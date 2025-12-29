@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/auth_session_provider.dart';
 import 'account_view.dart';
 import 'billing_view.dart';
 import 'certificates_view.dart';
 import 'contact_view.dart';
 import 'preferences_view.dart';
-
+import '../auth/loginpage.dart';
 class SettingsView extends ConsumerWidget {
   const SettingsView({super.key});
 
@@ -119,7 +120,7 @@ class SettingsView extends ConsumerWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    _showLogoutDialog(context);
+                    _showLogoutDialog(context, ref);
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Log Out'),
@@ -187,35 +188,46 @@ class SettingsView extends ConsumerWidget {
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text('Log Out'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implement logout
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Log Out'),
-          ),
-        ],
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-    );
-  }
+      title: const Text('Log Out'),
+      content: const Text('Are you sure you want to log out?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context); // close dialog
+
+            await ref.read(authSessionProvider.notifier).logout();
+
+            if (!context.mounted) return;
+
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LoginPage(),
+              ),
+              (route) => false,
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text('Log Out'),
+        ),
+      ],
+    ),
+  );
+}
 }

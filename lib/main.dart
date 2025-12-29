@@ -9,7 +9,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
 
-  WidgetsBinding.instance.deferFirstFrame();
 
   runApp(
     const ProviderScope(
