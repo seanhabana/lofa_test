@@ -44,6 +44,9 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   flutter_dotenv: ^6.0.0
   http: ^1.6.0
+  cached_network_image: ^3.4.1
+  video_player: ^2.10.1
+  webview_flutter: ^4.13.0
   
 
 flutter_native_splash:

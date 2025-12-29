@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../models/course_models.dart';
 import '../../providers/course_provider.dart';
 import '../../shared/navigation_utils.dart';
 import '../../shared/plan_badge.dart';
@@ -16,13 +18,14 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
   String _searchQuery = '';
   bool _showFilters = false;
   String _selectedPlanFilter = 'All';
-  String _sortBy = 'default'; // default, rating, duration
+  String _sortBy = 'default';
 
   final planFilters = ['All', 'Free', 'Core', 'Pro', 'Elite'];
   final sortOptions = [
     {'value': 'default', 'label': 'Default'},
     {'value': 'rating', 'label': 'Highest Rated'},
     {'value': 'duration', 'label': 'Duration'},
+    {'value': 'newest', 'label': 'Newest First'},
   ];
 
   @override
@@ -51,14 +54,19 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
     }
     
     // Apply sorting
-    if (_sortBy == 'rating') {
-      filtered.sort((a, b) => b.rating.compareTo(a.rating));
-    } else if (_sortBy == 'duration') {
-      filtered.sort((a, b) {
-        final aDuration = int.parse(a.durationHours.replaceAll(RegExp(r'[^0-9]'), ''));
-        final bDuration = int.parse(b.durationHours.replaceAll(RegExp(r'[^0-9]'), ''));
-        return aDuration.compareTo(bDuration);
-      });
+    switch (_sortBy) {
+      case 'rating':
+        filtered.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case 'duration':
+        filtered.sort((a, b) => a.estimatedDurationMinutes.compareTo(b.estimatedDurationMinutes));
+        break;
+      case 'newest':
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      default:
+        // Keep default order
+        break;
     }
     
     return filtered;
@@ -80,6 +88,11 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
             const Icon(Icons.error_outline, size: 60, color: Colors.red),
             const SizedBox(height: 16),
             Text('Error: $error'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => ref.refresh(coursesViewModelProvider),
+              child: const Text('Retry'),
+            ),
           ],
         ),
       ),
@@ -87,40 +100,6 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
   }
 
   Widget _buildCoursesContent(BuildContext context, CoursesState state) {
-    // Combine all courses for filtering
-    final allCourses = [
-      ...state.latestCourses,
-      ...state.freeCourses,
-      ...state.corePlanCourses,
-      ...state.proPlanCourses,
-      ...state.elitePlanCourses,
-    ].toSet().toList();
-
-    // Group courses by category
-    final coursesByCategory = <String, List<Course>>{};
-    for (var course in allCourses) {
-      if (!coursesByCategory.containsKey(course.category)) {
-        coursesByCategory[course.category] = [];
-      }
-      coursesByCategory[course.category]!.add(course);
-    }
-
-    // Category display names
-    final categoryNames = {
-      'support-strategies': 'Support Strategies',
-      'communication': 'Communication Skills',
-      'assistive-technology': 'Assistive Technology',
-      'ndis-processes': 'NDIS Processes & Planning',
-      'person-centered-care': 'Person-Centered Care',
-      'daily-living': 'Daily Living Support',
-      'behavioural-support': 'Behavioural Support',
-      'crisis-management': 'Crisis Management',
-      'family-carer': 'Family & Carer Support',
-      'inclusive-practices': 'Inclusive Practices',
-      'professional-development': 'Professional Development',
-      'rights-advocacy': 'Rights & Advocacy',
-    };
-
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,33 +108,67 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
           _buildSearchBar(),
           if (_showFilters) _buildFilterSection(),
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Latest Courses Section
-                  _buildSection(
-                    title: 'Latest Courses',
-                    courses: _filterAndSortCourses(state.latestCourses),
-                    showBadge: true,
-                    badgeText: 'NEW',
-                    badgeColor: const Color(0xFF581C87),
-                  ),
-                  
-                  // Category-based Sections
-                  ...coursesByCategory.entries.map((entry) {
-                    final categoryKey = entry.key;
-                    final categoryCourses = entry.value;
-                    final categoryName = categoryNames[categoryKey] ?? categoryKey;
+            child: RefreshIndicator(
+              color: const Color(0xFF581C87),
+              onRefresh: () async {
+                ref.invalidate(coursesViewModelProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
                     
-                    return _buildSection(
-                      title: categoryName,
-                      courses: _filterAndSortCourses(categoryCourses),
-                    );
-                  }).toList(),
-                  
-                  const SizedBox(height: 24),
-                ],
+                    // Latest Courses
+                    if (_selectedPlanFilter == 'All')
+                      _buildSection(
+                        title: 'Latest Courses',
+                        courses: _filterAndSortCourses(state.latestCourses),
+                        showBadge: true,
+                        badgeText: 'NEW',
+                        badgeColor: const Color(0xFF581C87),
+                      ),
+                    
+                    // Free Courses
+                    if (_selectedPlanFilter == 'All' || _selectedPlanFilter == 'Free')
+                      _buildSection(
+                        title: 'Free Courses',
+                        courses: _filterAndSortCourses(state.freeCourses),
+                        icon: Icons.public,
+                        iconColor: Colors.green,
+                      ),
+                    
+                    // Core Plan Courses
+                    if (_selectedPlanFilter == 'All' || _selectedPlanFilter == 'Core')
+                      _buildSection(
+                        title: 'Core Plan Courses',
+                        courses: _filterAndSortCourses(state.corePlanCourses),
+                        icon: Icons.workspace_premium,
+                        iconColor: const Color(0xFF9D65AA),
+                      ),
+                    
+                    // Pro Plan Courses
+                    if (_selectedPlanFilter == 'All' || _selectedPlanFilter == 'Pro')
+                      _buildSection(
+                        title: 'Pro Plan Courses',
+                        courses: _filterAndSortCourses(state.proPlanCourses),
+                        icon: Icons.star,
+                        iconColor: const Color(0xFF581C87),
+                      ),
+                    
+                    // Elite Plan Courses
+                    if (_selectedPlanFilter == 'All' || _selectedPlanFilter == 'Elite')
+                      _buildSection(
+                        title: 'Elite Plan Courses',
+                        courses: _filterAndSortCourses(state.elitePlanCourses),
+                        icon: Icons.diamond,
+                        iconColor: Colors.amber.shade700,
+                      ),
+                    
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
           ),
@@ -192,7 +205,7 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 255, 255, 255),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.grey[300]!),
       ),
@@ -361,6 +374,8 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
     bool showBadge = false,
     String? badgeText,
     Color? badgeColor,
+    IconData? icon,
+    Color? iconColor,
   }) {
     if (courses.isEmpty) return const SizedBox.shrink();
 
@@ -369,13 +384,37 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+          child: Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 24, color: iconColor),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${courses.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -400,163 +439,208 @@ class _CoursesViewState extends ConsumerState<CoursesView> {
   }
 
   Widget _buildCourseCard(
-    BuildContext context,
-    Course course, {
-    bool showBadge = false,
-    String? badgeText,
-    Color? badgeColor,
-  }) {
-    return CourseCardWrapper(
-      courseId: course.id,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  BuildContext context,
+  Course course, {
+  bool showBadge = false,
+  String? badgeText,
+  Color? badgeColor,
+}) {
+  final imageUrl = course.imageUrl;
+
+  return CourseCardWrapper(
+    courseId: course.id.toString(),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      height: 140, // Add fixed height
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image Section
+          Stack(
             children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 120,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+                child: imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 120,
+                        height: 140,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 120,
+                          height: 140,
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF9D65AA),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          width: 120,
+                          height: 140,
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Icon(
+                              Icons.play_circle_outline,
+                              size: 40,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 120,
+                        height: 140,
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 36,
+                            color: Colors.grey,
+                          ),
+                        ),
                       ),
+              ),
+              if (showBadge && badgeText != null)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.play_circle_outline,
-                        size: 40,
-                        color: Colors.grey,
+                    decoration: BoxDecoration(
+                      color: badgeColor ?? const Color(0xFF581C87),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                  if (showBadge && badgeText != null)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: badgeColor ?? const Color(0xFF581C87),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          badgeText,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+                ),
+            ],
+          ),
+          
+          // Content Section
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Title and Badge
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              course.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                                height: 1.2,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      Expanded(
+                        child: Text(
+                          course.title.isNotEmpty ? course.title : 'Untitled Course',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            height: 1.2,
                           ),
-                          const SizedBox(width: 8),
-                          PlanBadgeCompact(plan: course.plan),
-                        ],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(width: 8),
+                      PlanBadgeCompact(plan: course.plan),
+                    ],
+                  ),
+                  
+                  // Description
+                  Text(
+                    course.shortDescription.isNotEmpty
+                        ? course.shortDescription
+                        : (course.description.isNotEmpty 
+                            ? course.description 
+                            : 'No description available'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  
+                  // Stats Row
+                  Row(
+                    children: [
+                      Icon(Icons.star, size: 14, color: Colors.amber[700]),
+                      const SizedBox(width: 4),
                       Text(
-                        course.description,
+                        course.rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        course.durationHours,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
-                          height: 1.3,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.star, size: 14, color: Colors.amber[700]),
-                          const SizedBox(width: 4),
-                          Text(
-                            course.rating.toString(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.menu_book,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '${course.totalLessons} lessons',
+                          style: TextStyle(
+                            fontSize: 12,
                             color: Colors.grey[600],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            course.durationHours,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.menu_book,
-                            size: 14,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${course.totalLessons} lessons',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

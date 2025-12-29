@@ -22,7 +22,7 @@ class HomePage extends ConsumerWidget {
         index: currentIndex,
         children: const [
           HomeView(),
-          CoursesView(),
+          // CoursesView(),
           ReportsView(),
           SettingsView(),
         ],

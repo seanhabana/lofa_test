@@ -1,11 +1,12 @@
 // lib/shared/navigation_utils.dart
 import 'package:flutter/material.dart';
-import '../providers/course_provider.dart';
 import '../features/courses/course_detail_view.dart';
 import '../features/courses/lesson_detail_view.dart';
+// import '../features/courses/lesson_detail_view.dart'; // Uncomment when ready
+
 class NavigationUtils {
   // Navigate to Course Detail
-  static void navigateToCourseDetail(BuildContext context, String courseId) {
+  static void navigateToCourseDetail(BuildContext context, int courseId) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -14,11 +15,10 @@ class NavigationUtils {
     );
   }
 
-  // Navigate to Lesson Detail
   static void navigateToLessonDetail(
     BuildContext context,
-    String lessonId,
-    String courseId,
+    int lessonId,
+    int courseId,
   ) {
     Navigator.push(
       context,
@@ -30,11 +30,12 @@ class NavigationUtils {
       ),
     );
   }
+
 }
 
 // Reusable Course Card Wrapper
 class CourseCardWrapper extends StatelessWidget {
-  final String courseId;
+  final dynamic courseId; // Accept both String and int
   final Widget child;
 
   const CourseCardWrapper({
@@ -45,14 +46,17 @@ class CourseCardWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Convert to int if it's a String
+    final int id = courseId is String ? int.parse(courseId) : courseId as int;
+    
     return GestureDetector(
-      onTap: () => NavigationUtils.navigateToCourseDetail(context, courseId),
+      onTap: () => NavigationUtils.navigateToCourseDetail(context, id),
       child: child,
     );
   }
 }
 
-// Slide up route animation (from utils.dart)
+// Slide up route animation
 Route slideUpRoute(Widget page) {
   return PageRouteBuilder(
     pageBuilder: (context, animation, secondaryAnimation) => page,
