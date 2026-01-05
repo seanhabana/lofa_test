@@ -414,29 +414,29 @@ class _AccountSettingsViewState extends ConsumerState<AccountSettingsView> {
   }
 
   void _handleSaveOrEdit(AccountSettings settings) async {
-    if (_isEditing) {
-      // Save changes
-      final name = _nameController.text.trim();
-      final phone = _phoneController.text.trim();
+  if (_isEditing) {
+    // Save changes
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
 
-      if (name.isEmpty) {
-        _showSnackBar('Name cannot be empty');
-        return;
-      }
-
-      try {
-        await ref
-            .read(accountSettingsProvider.notifier)
-            .updateProfile(name: name, phone: phone.isEmpty ? null : phone);
-        _showSnackBar('Profile updated successfully');
-        setState(() => _isEditing = false);
-      } catch (e) {
-        _showSnackBar('Failed to update profile: $e');
-      }
-    } else {
-      setState(() => _isEditing = true);
+    if (name.isEmpty) {
+      _showSnackBar('Name cannot be empty', isError: true);
+      return;
     }
+
+    try {
+      await ref
+          .read(accountSettingsProvider.notifier)
+          .updateProfile(name: name, phone: phone.isEmpty ? null : phone);
+      _showSnackBar('Profile updated successfully', isError: false); // CHANGED: Added isError: false
+      setState(() => _isEditing = false);
+    } catch (e) {
+      _showSnackBar('Failed to update profile: $e', isError: true); // CHANGED: Added isError: true
+    }
+  } else {
+    setState(() => _isEditing = true);
   }
+}
 
  void _showChangePasswordDialog(BuildContext context) {
   final currentPasswordController = TextEditingController();

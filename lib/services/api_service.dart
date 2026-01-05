@@ -18,11 +18,19 @@ class ApiService {
     return headers;
   }
 
+  // Helper to check if endpoint is a full URL
+  static bool _isFullUrl(String endpoint) {
+    return endpoint.startsWith('http://') || endpoint.startsWith('https://');
+  }
+
   static Future<http.Response> get(
     String endpoint, {
     String? token,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    // If endpoint is a full URL, use it directly; otherwise prepend baseUrl
+    final url = _isFullUrl(endpoint) 
+        ? Uri.parse(endpoint) 
+        : Uri.parse('$baseUrl$endpoint');
     
     print('📥 GET Request to: $url');
     print('📥 Token: ${token != null ? "${token.substring(0, 20)}..." : "none"}');
@@ -48,7 +56,9 @@ class ApiService {
     Map<String, dynamic>? body,
     String? token,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    final url = _isFullUrl(endpoint) 
+        ? Uri.parse(endpoint) 
+        : Uri.parse('$baseUrl$endpoint');
     
     print('📤 POST Request to: $url');
     print('📤 Body: $body');
@@ -85,7 +95,9 @@ class ApiService {
     Map<String, dynamic>? body,
     String? token,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    final url = _isFullUrl(endpoint) 
+        ? Uri.parse(endpoint) 
+        : Uri.parse('$baseUrl$endpoint');
     
     print('🔄 PUT Request to: $url');
     print('🔄 Body: $body');
@@ -122,7 +134,9 @@ class ApiService {
     Map<String, dynamic>? body,
     String? token,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    final url = _isFullUrl(endpoint) 
+        ? Uri.parse(endpoint) 
+        : Uri.parse('$baseUrl$endpoint');
     
     print('🗑️ DELETE Request to: $url');
     print('🗑️ Body: $body');
@@ -159,7 +173,9 @@ class ApiService {
     Map<String, dynamic>? body,
     String? token,
   }) async {
-    final url = Uri.parse('$baseUrl$endpoint');
+    final url = _isFullUrl(endpoint) 
+        ? Uri.parse(endpoint) 
+        : Uri.parse('$baseUrl$endpoint');
     
     print('🔧 PATCH Request to: $url');
     print('🔧 Body: $body');
@@ -190,4 +206,5 @@ class ApiService {
       rethrow;
     }
   }
+
 }

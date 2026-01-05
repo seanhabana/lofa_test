@@ -35,30 +35,49 @@ class AccountSettingsService {
     }
   }
 
-  // Update profile (name, phone)
+  // Update profile (name, phone) - FIXED ENDPOINT
   Future<AccountSettings> updateProfile(UpdateProfileRequest request, String token) async {
     try {
       print('🔄 Updating profile...');
       final response = await ApiService.put(
-        '/account/profile',
+        '/auth/profile', // CHANGED from /account/profile
         body: request.toJson(),
         token: token,
       );
 
       print('📡 Update profile response status: ${response.statusCode}');
+      print('📡 Update profile response body: ${response.body}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final apiResponse = ApiResponse<AccountSettings>.fromJson(
-          data,
-          (data) => AccountSettings.fromJson(data as Map<String, dynamic>),
-        );
         
-        if (apiResponse.success) {
+        // FIXED: Handle the actual response structure
+        if (data['success'] == true) {
           print('✅ Profile updated successfully');
-          return apiResponse.data;
+          
+          // Extract user data and convert to AccountSettings
+          final userData = data['user'] as Map<String, dynamic>;
+          
+          return AccountSettings(
+            email: userData['email'] ?? '',
+            name: userData['name'] ?? '',
+            role: UserRole(
+              id: userData['role_id'] ?? 0,
+              name: userData['role'] ?? '',
+              displayName: userData['role_display_name'] ?? '',
+              description: '',
+              isActive: true,
+              createdAt: userData['created_at'] ?? '',
+              updatedAt: userData['updated_at'] ?? '',
+            ),
+            roleDisplayName: userData['role_display_name'] ?? 'N/A',
+            twoFactorEnabled: userData['two_factor_enabled'] == 1,
+            twoFactorMethod: userData['two_factor_method'],
+            isDeactivated: userData['is_deactivated'] == 1,
+            phone: userData['phone'],
+          );
         } else {
-          throw Exception(apiResponse.message ?? 'Failed to update profile');
+          throw Exception(data['message'] ?? 'Failed to update profile');
         }
       } else {
         final errorData = json.decode(response.body);

@@ -5,6 +5,8 @@ import '../../models/course_models.dart';
 import '../../providers/course_provider.dart';
 import '../../shared/navigation_utils.dart';
 import '../../shared/plan_badge.dart';
+import '../settings/account_view.dart';
+import '../settings/billing_view.dart';
 
 class HomeView extends ConsumerWidget {
   const HomeView({super.key});
@@ -16,9 +18,7 @@ class HomeView extends ConsumerWidget {
     return homeState.when(
       data: (data) => _buildHomeContent(context, ref, data),
       loading: () => const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF581C87),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF581C87)),
       ),
       error: (error, stack) => Center(
         child: Column(
@@ -40,7 +40,11 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildHomeContent(BuildContext context, WidgetRef ref, HomeState state) {
+  Widget _buildHomeContent(
+    BuildContext context,
+    WidgetRef ref,
+    HomeState state,
+  ) {
     return RefreshIndicator(
       color: const Color(0xFF581C87),
       onRefresh: () async {
@@ -52,8 +56,8 @@ class HomeView extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(state.user),
-              
+              _buildHeader(context, state.user),
+
               // Featured Courses Section
               if (state.featuredCourses.isNotEmpty) ...[
                 _buildSection(
@@ -67,7 +71,7 @@ class HomeView extends ConsumerWidget {
                       itemCount: state.featuredCourses.length,
                       itemBuilder: (context, index) {
                         return _buildFeaturedCourseCard(
-                          context, 
+                          context,
                           state.featuredCourses[index],
                         );
                       },
@@ -91,7 +95,7 @@ class HomeView extends ConsumerWidget {
                           itemCount: state.enrolledCourses.length,
                           itemBuilder: (context, index) {
                             return _buildEnrolledCourseCard(
-                              context, 
+                              context,
                               state.enrolledCourses[index],
                             );
                           },
@@ -113,7 +117,7 @@ class HomeView extends ConsumerWidget {
                       itemCount: state.recommendedCourses.length,
                       itemBuilder: (context, index) {
                         return _buildRecommendedCourseCard(
-                          context, 
+                          context,
                           state.recommendedCourses[index],
                         );
                       },
@@ -142,11 +146,7 @@ class HomeView extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.school_outlined,
-            size: 60,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.school_outlined, size: 60, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No Enrolled Courses Yet',
@@ -159,10 +159,7 @@ class HomeView extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             'Start learning by enrolling in a course!',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -170,43 +167,96 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(UserProfile user) {
+  String _getInitials(String name) {
+    final names = name.trim().split(' ');
+    if (names.isEmpty) return '';
+    if (names.length == 1) {
+      return names[0].isNotEmpty ? names[0][0].toUpperCase() : '';
+    }
+    return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  }
+
+  Widget _buildHeader(BuildContext context, UserProfile user) {
     return Container(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.grey[300],
-            child: const Icon(Icons.person, size: 35, color: Colors.grey),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AccountSettingsView()),
+              );
+            },
+            child: CircleAvatar(
+              radius: 30,
+              backgroundColor: const Color(0xFF581C87),
+              child: Text(
+                _getInitials(user.name),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome, ${user.name}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF581C87),
+            child: GestureDetector(
+              onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AccountSettingsView(),
+                        ),
+                      );
+                    },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome, ${user.name}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF581C87),
+                    ),
                   ),
-                ),
-                Text(
-                  user.subscriptionPlan,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BillingView(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      user.subscriptionPlan,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          Icon(
-            user.isPremium ? Icons.star : Icons.star_outline,
-            color: const Color(0xFF9D65AA),
-            size: 32,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BillingView()),
+              );
+            },
+            child: Icon(
+              user.isPremium ? Icons.star : Icons.star_outline,
+              color: const Color(0xFF9D65AA),
+              size: 32,
+            ),
           ),
         ],
       ),
@@ -300,7 +350,9 @@ class HomeView extends ConsumerWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                   child: _buildCourseImage(course.imageUrl, height: 200),
                 ),
                 Positioned(
@@ -464,7 +516,9 @@ class HomeView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
               child: _buildCourseImage(course.imageUrl, height: 110),
             ),
             Expanded(
@@ -488,10 +542,7 @@ class HomeView extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         course.shortDescription,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -506,7 +557,10 @@ class HomeView extends ConsumerWidget {
                           children: [
                             Text(
                               'Duration',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -524,7 +578,10 @@ class HomeView extends ConsumerWidget {
                           children: [
                             Text(
                               'Lessons',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -548,7 +605,10 @@ class HomeView extends ConsumerWidget {
                           children: [
                             Text(
                               'Progress',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             Text(
                               '${course.progressPercentage.toInt()}%',
@@ -564,7 +624,9 @@ class HomeView extends ConsumerWidget {
                         LinearProgressIndicator(
                           value: progressValue,
                           backgroundColor: Colors.grey[200],
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9D65AA)),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF9D65AA),
+                          ),
                           minHeight: 6,
                           borderRadius: BorderRadius.circular(3),
                         ),
@@ -603,14 +665,19 @@ class HomeView extends ConsumerWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
                   child: _buildCourseImage(course.imageUrl, height: 120),
                 ),
                 Positioned(
                   top: 8,
                   right: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.65),
                       borderRadius: BorderRadius.circular(20),
@@ -655,10 +722,7 @@ class HomeView extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         course.shortDescription,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -673,7 +737,10 @@ class HomeView extends ConsumerWidget {
                           children: [
                             Text(
                               'Duration',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -691,7 +758,10 @@ class HomeView extends ConsumerWidget {
                           children: [
                             Text(
                               'Lessons',
-                              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[500],
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(

@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/subscription_models.dart';
+import '../../providers/subscription_providers.dart';
 
-// View Model
-final billingPeriodProvider = StateProvider<String>((ref) => 'Monthly');
-
-class BillingView extends ConsumerWidget {
+class BillingView extends ConsumerStatefulWidget {
   const BillingView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BillingView> createState() => _BillingViewState();
+}
+
+class _BillingViewState extends ConsumerState<BillingView> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch plans when the widget is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(subscriptionPlansProvider.notifier).fetchPlans();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final billingPeriod = ref.watch(billingPeriodProvider);
+    final plansState = ref.watch(subscriptionPlansProvider);
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -28,132 +42,180 @@ class BillingView extends ConsumerWidget {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: plansState.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : plansState.errorMessage != null
+              ? _buildErrorView(plansState.errorMessage!)
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage your subscription and access to premium content',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Choose Your Plan Header
+                      Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              'Choose Your Plan',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                foreground: Paint()
+                                  ..shader = const LinearGradient(
+                                    colors: [Color(0xFF581C87), Colors.blue],
+                                  ).createShader(const Rect.fromLTWH(0, 0, 300, 50)),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Unlock more content with our flexible subscription plans\ndesigned to accelerate your learning journey',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Billing Period Toggle
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildPeriodButton(
+                                    ref,
+                                    'Monthly',
+                                    billingPeriod == 'Monthly',
+                                  ),
+                                  _buildPeriodButton(
+                                    ref,
+                                    'Annual',
+                                    billingPeriod == 'Annual',
+                                    badge: 'Save More',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Global Discount Banner
+                      if (plansState.globalDiscount != null)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.celebration, color: Colors.green.shade700),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Limited Time Discount Active!',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      plansState.globalDiscount!.description,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Subscription Plans
+                      _buildPlansList(plansState.plans, billingPeriod),
+                      
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildErrorView(String errorMessage) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'Manage your subscription and access to premium content',
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red[300],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to Load Plans',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.black54,
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 24),
-            
-            // Choose Your Plan Header
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    'Choose Your Plan',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      foreground:  Paint()
-                        ..shader = const LinearGradient(
-                          colors: [Color(0xFF581C87), Colors.blue],
-                        ).createShader(const Rect.fromLTWH(0, 0, 300, 50)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Unlock more content with our flexible subscription plans\ndesigned to accelerate your learning journey',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Billing Period Toggle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildPeriodButton(
-                          ref,
-                          'Monthly',
-                          billingPeriod == 'Monthly',
-                        ),
-                        _buildPeriodButton(
-                          ref,
-                          'Annual',
-                          billingPeriod == 'Annual',
-                          badge: 'Save More',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(subscriptionPlansProvider.notifier).fetchPlans();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF581C87),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Discount Banner
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.celebration, color: Colors.green.shade700),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Limited Time Discount Active!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          billingPeriod == 'Monthly'
-                              ? 'Monthly: 10.0% Discount • Annual: 20.0% Discount'
-                              : 'Annual: 20.0% Discount',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Subscription Plans
-            if (billingPeriod == 'Monthly')
-              _buildMonthlyPlans()
-            else
-              _buildAnnualPlans(),
-            
-            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -208,165 +270,52 @@ class BillingView extends ConsumerWidget {
     );
   }
 
-  Widget _buildMonthlyPlans() {
+  Widget _buildPlansList(List<SubscriptionPlan> plans, String billingPeriod) {
+    // Sort by tier level - show all plans regardless of billing_interval
+    final sortedPlans = [...plans];
+    sortedPlans.sort((a, b) => a.tierLevel.compareTo(b.tierLevel));
+
     return Column(
-      children: [
-        _buildPlanCard(
-          title: 'Core',
-          subtitle: 'Essential learning resource for NDIS support',
-          originalPrice: 'A\$17',
-          price: 'A\$13',
-          period: '/month',
-          savings: 'Save A\$2 per month',
-          features: [
-            'Access to Core-level lessons',
-            'Basic progress tracking',
-            'Community support',
-            'Email notifications',
-            'Mobile-friendly access',
-          ],
-          color: Colors.grey.shade700,
-          isPopular: false,
-        ),
-        const SizedBox(height: 16),
-        _buildPlanCard(
-          title: 'Pro',
-          subtitle: 'Advanced learning with priority support',
-          originalPrice: 'A\$30',
-          price: 'A\$27',
-          period: '/month',
-          savings: 'Save A\$3 per month',
-          features: [
-            'All Core features',
-            'Access to Pro-level lessons',
-            'Advanced progress analytics',
-            'Priority support',
-            'Downloadable resources',
-            'Certificate generation',
-            'Early access to new content',
-            'Webinar recordings',
-          ],
-          color: const Color(0xFF581C87),
-          isPopular: true,
-        ),
-        const SizedBox(height: 16),
-        _buildPlanCard(
-          title: 'Elite',
-          subtitle: 'Complete professional development suite',
-          originalPrice: 'A\$60',
-          price: 'A\$54',
-          period: '/month',
-          savings: 'Save A\$6 per month',
-          features: [
-            'All Pro features',
-            'Elite-level exclusive content',
-            'One-on-one mentoring sessions',
-            'Custom learning paths',
-            'Advanced certifications',
-            'Priority course requests',
-            'Live Q&A sessions',
-            'Professional networking access',
-            'Continuing education credits',
-          ],
-          color: Colors.amber.shade700,
-          isPopular: false,
-          isFeatured: true,
-        ),
-      ],
+      children: sortedPlans
+          .map((plan) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildPlanCard(plan, billingPeriod),
+              ))
+          .toList(),
     );
   }
 
-  Widget _buildAnnualPlans() {
-    return Column(
-      children: [
-        _buildPlanCard(
-          title: 'Core',
-          subtitle: 'Essential learning resource for NDIS support',
-          originalPrice: 'A\$150',
-          price: 'A\$120',
-          period: '/year',
-          savings: 'Save A\$42 per year',
-          subtext: 'A\$10/month equivalent',
-          features: [
-            'Access to Core-level lessons',
-            'Basic progress tracking',
-            'Community support',
-            'Email notifications',
-            'Mobile-friendly access',
-          ],
-          color: Colors.grey.shade700,
-          isPopular: false,
-        ),
-        const SizedBox(height: 16),
-        _buildPlanCard(
-          title: 'Pro',
-          subtitle: 'Advanced learning with priority support',
-          originalPrice: 'A\$300',
-          price: 'A\$240',
-          period: '/year',
-          savings: 'Save A\$84 per year',
-          subtext: 'A\$20/month equivalent',
-          features: [
-            'All Core features',
-            'Access to Pro-level lessons',
-            'Advanced progress analytics',
-            'Priority support',
-            'Downloadable resources',
-            'Certificate generation',
-            'Early access to new content',
-            'Webinar recordings',
-          ],
-          color: const Color(0xFF581C87),
-          isPopular: true,
-        ),
-        const SizedBox(height: 16),
-        _buildPlanCard(
-          title: 'Elite',
-          subtitle: 'Complete professional development suite',
-          originalPrice: 'A\$600',
-          price: 'A\$480',
-          period: '/year',
-          savings: 'Save A\$168 per year',
-          subtext: 'A\$40/month equivalent',
-          features: [
-            'All Pro features',
-            'Elite-level exclusive content',
-            'One-on-one mentoring sessions',
-            'Custom learning paths',
-            'Advanced certifications',
-            'Priority course requests',
-            'Live Q&A sessions',
-            'Professional networking access',
-            'Continuing education credits',
-          ],
-          color: Colors.amber.shade700,
-          isPopular: false,
-          isFeatured: true,
-        ),
-      ],
-    );
-  }
+  Widget _buildPlanCard(SubscriptionPlan plan, String billingPeriod) {
+    final color = _getColorFromScheme(plan.colorScheme);
+    final isAnnual = billingPeriod == 'Annual';
+    
+    // Use monthly or annual price based on selected period
+    final displayPrice = isAnnual ? plan.annualPrice : plan.monthlyPrice;
+    
+    // For annual, calculate savings: (monthly * 12) - annual
+    final annualSavings = isAnnual 
+        ? (plan.monthlyPrice * 12) - plan.annualPrice 
+        : 0.0;
+    
+    // Monthly equivalent for annual plans
+    final monthlyEquivalent = isAnnual ? plan.annualPrice / 12 : 0.0;
 
-  Widget _buildPlanCard({
-    required String title,
-    required String subtitle,
-    required String originalPrice,
-    required String price,
-    required String period,
-    required String savings,
-    String? subtext,
-    required List<String> features,
-    required Color color,
-    required bool isPopular,
-    bool isFeatured = false,
-  }) {
+    // Format currency
+    final currencySymbol = _getCurrencySymbol(plan.currency);
+    
+    // Calculate savings text
+    String savingsText = '';
+    if (isAnnual && annualSavings > 0) {
+      savingsText = 'Save $currencySymbol${annualSavings.toStringAsFixed(2)} per year';
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isPopular ? const Color(0xFF581C87) : Colors.grey.shade200,
-          width: isPopular ? 2 : 1,
+          color: plan.isPopular ? const Color(0xFF581C87) : Colors.grey.shade200,
+          width: plan.isPopular ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -398,17 +347,13 @@ class BillingView extends ConsumerWidget {
                     Row(
                       children: [
                         Icon(
-                          title == 'Core'
-                              ? Icons.star_outline
-                              : title == 'Pro'
-                                  ? Icons.bolt
-                                  : Icons.workspace_premium,
+                          _getIconForPlan(plan.name),
                           color: color,
                           size: 24,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          title,
+                          plan.displayName,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -417,7 +362,7 @@ class BillingView extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    if (isPopular)
+                    if (plan.isPopular)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
@@ -440,7 +385,7 @@ class BillingView extends ConsumerWidget {
                           ],
                         ),
                       ),
-                    if (isFeatured)
+                    if (plan.isFeatured)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
@@ -467,7 +412,7 @@ class BillingView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  subtitle,
+                  plan.shortDescription,
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -478,16 +423,7 @@ class BillingView extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      originalPrice,
-                      style: TextStyle(
-                        fontSize: 16,
-                        decoration: TextDecoration.lineThrough,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      price,
+                      '$currencySymbol${displayPrice.toStringAsFixed(0)}',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -498,7 +434,7 @@ class BillingView extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(
-                        period,
+                        isAnnual ? '/year' : '/month',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
@@ -507,33 +443,35 @@ class BillingView extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.trending_down, size: 14, color: Colors.orange.shade700),
-                      const SizedBox(width: 4),
-                      Text(
-                        savings,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade700,
+                if (savingsText.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_down, size: 14, color: Colors.orange.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          savingsText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (subtext != null) ...[
+                ],
+                if (isAnnual && monthlyEquivalent > 0) ...[
                   const SizedBox(height: 8),
                   Text(
-                    subtext,
+                    '$currencySymbol${monthlyEquivalent.toStringAsFixed(2)}/month equivalent',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -550,7 +488,7 @@ class BillingView extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ...features.map((feature) => Padding(
+                ...plan.features.map((feature) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,7 +516,7 @@ class BillingView extends ConsumerWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      // TODO: Navigate to payment
+                      _handleSubscription(plan, billingPeriod);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
@@ -590,10 +528,10 @@ class BillingView extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.credit_card, size: 20),
+                        const Icon(Icons.credit_card, size: 20, color: Colors.white,),
                         const SizedBox(width: 8),
                         Text(
-                          'Subscribe for $price$period',
+                          'Subscribe for $currencySymbol${displayPrice.toStringAsFixed(0)}${isAnnual ? '/year' : '/month'}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -606,6 +544,86 @@ class BillingView extends ConsumerWidget {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getColorFromScheme(String colorScheme) {
+    switch (colorScheme.toLowerCase()) {
+      case 'blue':
+        return Colors.blue.shade700;
+      case 'purple':
+        return const Color(0xFF581C87);
+      case 'orange':
+        return Colors.orange.shade700;
+      case 'green':
+        return Colors.green.shade700;
+      case 'red':
+        return Colors.red.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  IconData _getIconForPlan(String planName) {
+    switch (planName.toLowerCase()) {
+      case 'core':
+        return Icons.star_outline;
+      case 'pro':
+        return Icons.bolt;
+      case 'elite':
+        return Icons.workspace_premium;
+      default:
+        return Icons.card_membership;
+    }
+  }
+
+  String _getCurrencySymbol(String currency) {
+    switch (currency.toUpperCase()) {
+      case 'AUD':
+        return 'A\$';
+      case 'USD':
+        return '\$';
+      case 'EUR':
+        return '€';
+      case 'GBP':
+        return '£';
+      default:
+        return currency;
+    }
+  }
+
+  void _handleSubscription(SubscriptionPlan plan, String billingPeriod) {
+    final isAnnual = billingPeriod == 'Annual';
+    final price = isAnnual ? plan.annualPrice : plan.monthlyPrice;
+    
+    // TODO: Implement navigation to payment page with plan details
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Subscribe to ${plan.displayName}'),
+        content: Text(
+          'You selected the ${plan.displayName} plan.\n\n'
+          'Plan ID: ${plan.id}\n'
+          'Billing: ${isAnnual ? 'Annual' : 'Monthly'}\n'
+          'Price: ${_getCurrencySymbol(plan.currency)}${price.toStringAsFixed(2)}'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to payment page with:
+              // - plan.id
+              // - billingPeriod (Monthly/Annual)
+              // - price
+            },
+            child: const Text('Continue to Payment'),
           ),
         ],
       ),
