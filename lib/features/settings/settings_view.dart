@@ -56,7 +56,7 @@ class SettingsView extends ConsumerWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AccountView()),
+                    MaterialPageRoute(builder: (context) => const AccountSettingsView()),
                   );
                 },
               ),
