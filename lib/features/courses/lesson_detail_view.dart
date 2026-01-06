@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:video_player/video_player.dart';
 import '../../models/lesson_models.dart';
-import '../../models/course_models.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/auth_session_provider.dart';
 import '../../services/course_service.dart';
-import '../../shared/navigation_utils.dart';
+import '../../shared/widgets/congratulations_modal.dart';
+import 'write_review_view.dart';
 
 class LessonDetailView extends ConsumerStatefulWidget {
   final int lessonId;
@@ -24,32 +25,31 @@ class LessonDetailView extends ConsumerStatefulWidget {
 }
 
 class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
-  WebViewController? _webViewController;
+  VideoPlayerController? _videoController;
   bool _isVideoLoading = true;
   bool _isMarkingComplete = false;
-  double _videoAspectRatio = 16 / 9;
-  int _currentPositionSeconds = 0;
+  bool _hasMarkedComplete = false;
   int _totalWatchTimeSeconds = 0;
   DateTime? _lastUpdateTime;
-  int? _videoDurationSeconds; // Store video duration
+  int? _videoDurationSeconds;
+  bool _showControls = true;
+  bool _isFullScreen = false;
+  bool _isSeeking = false;
 
   @override
   void initState() {
     super.initState();
-    // Enable auto-rotation for fullscreen video
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     
-    // Start periodic progress updates
     _startProgressTracking();
   }
 
   void _startProgressTracking() {
-    // Update progress every 10 seconds while watching
-    Future.delayed(const Duration(seconds: 10), () {
+    Future.delayed(const Duration(seconds: 30), () {
       if (mounted) {
         _updateProgress();
         _startProgressTracking();
@@ -57,43 +57,98 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
     });
   }
 
+  String _convertToHLS(String embedUrl) {
+    final pullZoneHost = dotenv.env['BUNNY_PULL_ZONE_HOST'];
+    
+    try {
+      final uri = Uri.parse(embedUrl);
+      final segments = uri.pathSegments;
+      
+      if (segments.length >= 3 && segments[0] == 'embed') {
+        final videoId = segments[2];
+        return '$pullZoneHost/$videoId/playlist.m3u8';
+      }
+      
+      return embedUrl;
+    } catch (e) {
+      print('⚠️ Failed to convert URL: $e');
+      return embedUrl;
+    }
+  }
+
+  Future<void> _initializeVideo(String embedUrl) async {
+    try {
+      final hlsUrl = _convertToHLS(embedUrl);
+      print('🎥 Loading HLS: $hlsUrl');
+
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(hlsUrl));
+      
+      await _videoController!.initialize();
+      
+      if (mounted) {
+        setState(() {
+          _isVideoLoading = false;
+          _videoDurationSeconds = _videoController!.value.duration.inSeconds;
+          _lastUpdateTime = DateTime.now();
+        });
+
+        print('✅ Video initialized: ${_videoDurationSeconds}s');
+        _videoController!.addListener(_videoListener);
+      }
+    } catch (e) {
+      print('❌ Video initialization failed: $e');
+      if (mounted) {
+        setState(() {
+          _isVideoLoading = false;
+        });
+      }
+    }
+  }
+
+  void _videoListener() {
+    if (_videoController == null || !_videoController!.value.isInitialized) return;
+
+    // Update UI if not seeking
+    if (!_isSeeking && mounted) {
+      setState(() {});
+    }
+
+    final position = _videoController!.value.position.inSeconds;
+    final duration = _videoController!.value.duration.inSeconds;
+
+    if (!_hasMarkedComplete && duration > 0 && position >= duration - 2) {
+      print('🎬 Video ended at ${position}s / ${duration}s');
+      _hasMarkedComplete = true;
+      _markLessonComplete();
+    }
+  }
+
   Future<void> _updateProgress() async {
     final authState = ref.read(authSessionProvider);
     final token = authState.token;
     
-    if (token == null) return;
+    if (token == null || _videoController == null) return;
 
     final now = DateTime.now();
-    if (_lastUpdateTime != null) {
+    if (_lastUpdateTime != null && _videoController!.value.isPlaying) {
       final elapsed = now.difference(_lastUpdateTime!).inSeconds;
       _totalWatchTimeSeconds += elapsed;
     }
     _lastUpdateTime = now;
 
-    // Calculate progress percentage based on actual video duration
-    double progressPercentage = 0.0;
-    if (_videoDurationSeconds != null && _videoDurationSeconds! > 0) {
-      // Use current position if available, otherwise use total watch time
-      final progressTime = _currentPositionSeconds > 0 
-          ? _currentPositionSeconds 
-          : _totalWatchTimeSeconds;
-      
-      progressPercentage = (progressTime / _videoDurationSeconds!) * 100;
-      progressPercentage = progressPercentage.clamp(0.0, 100.0);
-      
-      print('📊 Progress update: ${progressPercentage.toStringAsFixed(1)}% (${progressTime}s / ${_videoDurationSeconds}s)');
-    } else {
-      print('⏳ Waiting for video duration... (watched: ${_totalWatchTimeSeconds}s)');
-      return; // Don't send progress until we have duration
-    }
+    if (_videoDurationSeconds == null || _videoDurationSeconds! <= 0) return;
 
-    // Update progress without marking as completed
+    final currentPosition = _videoController!.value.position.inSeconds;
+    final progressPercentage = (currentPosition / _videoDurationSeconds!) * 100;
+    
+    print('📊 Progress: ${progressPercentage.toStringAsFixed(1)}% (${currentPosition}s / ${_videoDurationSeconds}s)');
+
     await CourseService.updateLessonProgress(
       lessonId: widget.lessonId,
       token: token,
       watchTimeSeconds: _totalWatchTimeSeconds,
-      lastPositionSeconds: _currentPositionSeconds,
-      progressPercentage: progressPercentage,
+      lastPositionSeconds: currentPosition,
+      progressPercentage: progressPercentage.clamp(0.0, 100.0),
       completed: false,
     );
   }
@@ -116,30 +171,44 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
     }
 
     try {
-      // Mark lesson as completed
+      // Get current state before marking complete
+      final currentCourseDetail = await ref.read(courseDetailProvider(widget.courseId).future);
+      final wasLessonCompleted = currentCourseDetail.userProgress.isLessonCompleted(widget.lessonId);
+      final previousProgress = currentCourseDetail.userProgress.progressPercentage;
+      
       final success = await CourseService.markLessonCompleted(
         lessonId: widget.lessonId,
         token: token,
       );
 
       if (success && mounted) {
-        // Refresh course details to update UI
         ref.invalidate(courseDetailProvider(widget.courseId));
         
-        // Show completion message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Lesson completed! 🎉'),
-              ],
+        // Only show toast if lesson was not previously completed
+        if (!wasLessonCompleted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Lesson completed! 🎉'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
             ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+          );
+        }
+
+        // Check if course just became 100% complete
+        await Future.delayed(const Duration(milliseconds: 500));
+        final updatedCourseDetail = await ref.refresh(courseDetailProvider(widget.courseId).future);
+        
+        // Only show modal if course JUST reached 100% (wasn't 100% before)
+        if (updatedCourseDetail.userProgress.progressPercentage >= 100 && previousProgress < 100) {
+          _showCongratulationsModal(updatedCourseDetail);
+        }
       }
     } catch (e) {
       print('❌ Error marking lesson complete: $e');
@@ -152,15 +221,86 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
     }
   }
 
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+
+    if (_isFullScreen) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  void _skipSeconds(int seconds) {
+    if (_videoController == null || !_videoController!.value.isInitialized) return;
+    
+    final currentPosition = _videoController!.value.position;
+    final duration = _videoController!.value.duration;
+    final newPosition = currentPosition + Duration(seconds: seconds);
+    
+    if (newPosition < Duration.zero) {
+      _videoController!.seekTo(Duration.zero);
+    } else if (newPosition > duration) {
+      _videoController!.seekTo(duration);
+    } else {
+      _videoController!.seekTo(newPosition);
+    }
+  }
+
+  void _hideControlsAfterDelay() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _videoController != null && _videoController!.value.isPlaying) {
+        setState(() {
+          _showControls = false;
+        });
+      }
+    });
+  }
+
+  void _showCongratulationsModal(CourseDetail courseDetail) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CongratulationsModal(
+        courseTitle: courseDetail.course.title,
+        onWriteReview: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => WriteReviewView(
+                courseId: widget.courseId,
+                courseTitle: courseDetail.course.title,
+              ),
+            ),
+          );
+        },
+        onClose: () {
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    // Final progress update before leaving
     _updateProgress();
+    _videoController?.removeListener(_videoListener);
+    _videoController?.dispose();
     
-    // Reset to portrait only when leaving
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -168,25 +308,27 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
   Widget build(BuildContext context) {
     final courseDetailState = ref.watch(courseDetailProvider(widget.courseId));
 
+    if (_isFullScreen) {
+      return _buildFullScreenPlayer();
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: courseDetailState.when(
         data: (courseDetail) {
           final lesson = _findLesson(courseDetail);
           if (lesson == null) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
-                  const SizedBox(height: 16),
-                  const Text('Lesson not found'),
+                  Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  SizedBox(height: 16),
+                  Text('Lesson not found'),
                 ],
               ),
             );
           }
-          
-          // Wait for actual video duration from the player before sending progress updates
           
           return _buildContent(context, lesson, courseDetail);
         },
@@ -200,6 +342,46 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
               const Icon(Icons.error_outline, size: 60, color: Colors.red),
               const SizedBox(height: 16),
               Text('Error: $error'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullScreenPlayer() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () {
+            if (!_showControls) {
+              // If controls are hidden, just show them
+              setState(() {
+                _showControls = true;
+              });
+              _hideControlsAfterDelay();
+            }
+            // If controls are already shown, do nothing (let buttons handle their own taps)
+          },
+          child: Stack(
+            children: [
+              Center(
+                child: _videoController != null && _videoController!.value.isInitialized
+                    ? ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width,
+                          maxHeight: MediaQuery.of(context).size.height,
+                        ),
+                        child: AspectRatio(
+                          aspectRatio: _videoController!.value.aspectRatio,
+                          child: VideoPlayer(_videoController!),
+                        ),
+                      )
+                    : const CircularProgressIndicator(color: Colors.white),
+              ),
+              if (_videoController != null && _videoController!.value.isInitialized)
+                _buildEnhancedVideoControls(),
             ],
           ),
         ),
@@ -225,11 +407,20 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
   Widget _buildContent(BuildContext context, Lesson lesson, CourseDetail courseDetail) {
     final isCompleted = _isLessonCompleted(courseDetail);
     final topPadding = MediaQuery.of(context).padding.top;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Calculate video height based on aspect ratio
+    final videoAspectRatio = _videoController?.value.isInitialized == true
+        ? _videoController!.value.aspectRatio
+        : 16 / 9; // Default 16:9 aspect ratio
+    
+    final videoHeight = screenWidth / videoAspectRatio;
+    final expandedHeight = videoHeight.clamp(200.0, 500.0) + topPadding;
 
     return CustomScrollView(
       slivers: [
         SliverAppBar(
-          expandedHeight: 185 + topPadding,
+          expandedHeight: expandedHeight,
           pinned: true,
           backgroundColor: const Color(0xFF0A1929),
           leading: Padding(
@@ -328,221 +519,282 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
       );
     }
 
-    return Stack(
-      children: [
-        Container(
-          color: Colors.black,
-          child: _buildVideoWebView(lesson),
-        ),
-        if (_isVideoLoading)
+    if (_videoController == null) {
+      _initializeVideo(lesson.videoUrl);
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (!_showControls) {
+          setState(() {
+            _showControls = true;
+          });
+          _hideControlsAfterDelay();
+        }
+      },
+      child: Stack(
+        children: [
           Container(
-            color: const Color(0xFF0A1929),
-            child: const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
+            color: Colors.black,
+            width: double.infinity,
+            child: _videoController != null && _videoController!.value.isInitialized
+                ? Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxHeight: 500, // Max height for larger screens
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: _videoController!.value.aspectRatio,
+                        child: VideoPlayer(_videoController!),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
-      ],
+          if (_videoController != null && _videoController!.value.isInitialized)
+            _buildEnhancedVideoControls(),
+          if (_isVideoLoading)
+            Container(
+              color: const Color(0xFF0A1929),
+              child: const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildVideoWebView(Lesson lesson) {
-    // Initialize WebView controller if needed
-    if (_webViewController == null && lesson.videoUrl.isNotEmpty) {
-      _initializeWebView(lesson.videoUrl);
-    }
+  Widget _buildEnhancedVideoControls() {
+  final duration = _videoController!.value.duration;
+  final position = _videoController!.value.position;
 
-    return AspectRatio(
-      aspectRatio: _videoAspectRatio,
-      child: _webViewController != null
-          ? WebViewWidget(controller: _webViewController!)
-          : const SizedBox.shrink(),
-    );
-  }
+  return AnimatedOpacity(
+    opacity: _showControls ? 1.0 : 0.0,
+    duration: const Duration(milliseconds: 300),
+    child: IgnorePointer(
+      ignoring: !_showControls, 
+      child: Container(
+        color: Colors.black.withOpacity(0.3),
+        child: Stack(
+          children: [
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildControlButton(
+                    icon: Icons.replay_5,
+                    onPressed: () => _skipSeconds(-5),
+                    size: 40,
+                  ),
+                  const SizedBox(width: 32),
+                  _buildControlButton(
+                    icon: _videoController!.value.isPlaying
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    onPressed: () {
+                      setState(() {
+                        _showControls = true; 
+                        if (_videoController!.value.isPlaying) {
+                          _videoController!.pause();
+                        } else {
+                          _videoController!.play();
+                          _hideControlsAfterDelay();
+                        }
+                      });
+                    },
+                    size: 56,
+                  ),
+                  const SizedBox(width: 32),
+                  _buildControlButton(
+                    icon: Icons.forward_5,
+                    onPressed: () => _skipSeconds(5),
+                    size: 40,
+                  ),
+                ],
+              ),
+            ),
 
-  void _initializeWebView(String embedUrl) {
-    print('🎥 Initializing WebView for: $embedUrl');
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.7),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    if (_isFullScreen)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: _toggleFullScreen,
+                      ),
+                  ],
+                ),
+              ),
+            ),
 
-    // Detect video platform
-    final isYouTube = embedUrl.contains('youtube.com') || embedUrl.contains('youtu.be');
-    final isVimeo = embedUrl.contains('vimeo.com');
-
-    // Add API parameters to enable player APIs
-    String apiEnabledUrl = embedUrl;
-    if (isYouTube) {
-      apiEnabledUrl += (embedUrl.contains('?') ? '&' : '?') + 'enablejsapi=1';
-    }
-
-    // Create HTML wrapper for the iframe with video tracking
-    final html = '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #000;
-    }
-    iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-  </style>
-</head>
-<body>
-  <iframe 
-    id="videoPlayer"
-    src="$apiEnabledUrl" 
-    loading="eager" 
-    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;" 
-    allowfullscreen="true"
-    webkitallowfullscreen="true"
-    mozallowfullscreen="true">
-  </iframe>
-  
-  <script>
-    var videoDuration = null;
-    var currentTime = 0;
-    
-    // Listen for video events from YouTube/Vimeo
-    window.addEventListener('message', function(event) {
-      try {
-        var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        
-        // YouTube Player API
-        if (data.event === 'infoDelivery' && data.info && data.info.duration) {
-          // Got duration from YouTube
-          videoDuration = Math.round(data.info.duration);
-          window.FlutterChannel.postMessage('DURATION:' + videoDuration);
-        }
-        
-        if (data.event === 'infoDelivery' && data.info && data.info.currentTime) {
-          // Got current time from YouTube
-          currentTime = Math.round(data.info.currentTime);
-          window.FlutterChannel.postMessage('POSITION:' + currentTime);
-        }
-        
-        if (data.event === 'onStateChange' && data.info === 0) {
-          // Video ended (state 0)
-          window.FlutterChannel.postMessage('VIDEO_ENDED');
-        }
-        
-        // Vimeo Player API
-        if (data.event === 'ready') {
-          // Request duration from Vimeo
-          var iframe = document.getElementById('videoPlayer');
-          iframe.contentWindow.postMessage('{"method":"getDuration"}', '*');
-        }
-        
-        if (data.method === 'getDuration') {
-          videoDuration = Math.round(data.value);
-          window.FlutterChannel.postMessage('DURATION:' + videoDuration);
-        }
-        
-        if (data.event === 'timeupdate') {
-          currentTime = Math.round(data.data.seconds);
-          window.FlutterChannel.postMessage('POSITION:' + currentTime);
-        }
-        
-        if (data.event === 'ended') {
-          window.FlutterChannel.postMessage('VIDEO_ENDED');
-        }
-      } catch (e) {
-        // Not a video event, ignore
-      }
-    });
-    
-    // Request info from YouTube periodically
-    ${isYouTube ? '''
-    setInterval(function() {
-      var iframe = document.getElementById('videoPlayer');
-      if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}', '*');
-      }
-    }, 1000);
-    ''' : ''}
-    
-    // Request info from Vimeo periodically
-    ${isVimeo ? '''
-    setInterval(function() {
-      var iframe = document.getElementById('videoPlayer');
-      if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage('{"method":"getCurrentTime"}', '*');
-      }
-    }, 1000);
-    ''' : ''}
-  </script>
-</body>
-</html>
-''';
-
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..addJavaScriptChannel(
-        'FlutterChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          final msg = message.message;
-          
-          if (msg.startsWith('DURATION:')) {
-            // Got actual video duration
-            final duration = int.tryParse(msg.substring(9));
-            if (duration != null && duration > 0) {
-              print('🎥 Video duration detected: ${duration}s');
-              setState(() {
-                _videoDurationSeconds = duration;
-              });
-            }
-          } else if (msg.startsWith('POSITION:')) {
-            // Got current playback position
-            final position = int.tryParse(msg.substring(9));
-            if (position != null) {
-              _currentPositionSeconds = position;
-            }
-          } else if (msg == 'VIDEO_ENDED') {
-            print('🎬 Video ended - marking lesson as complete');
-            _markLessonComplete();
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            print('📺 Page started loading: $url');
-            _lastUpdateTime = DateTime.now();
-          },
-          onPageFinished: (String url) {
-            print('✅ Page finished loading: $url');
-            if (mounted) {
-              setState(() {
-                _isVideoLoading = false;
-              });
-            }
-          },
-          onWebResourceError: (WebResourceError error) {
-            print('❌ WebView error: ${error.description}');
-            if (mounted) {
-              setState(() {
-                _isVideoLoading = false;
-              });
-            }
-          },
+            // Bottom controls bar
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          _formatDuration(position),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              trackHeight: 3,
+                              thumbShape:
+                                  const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape:
+                                  const RoundSliderOverlayShape(overlayRadius: 14),
+                              activeTrackColor: const Color(0xFF581C87),
+                              inactiveTrackColor: Colors.white.withOpacity(0.3),
+                              thumbColor: const Color(0xFF581C87),
+                              overlayColor: const Color(0xFF581C87).withOpacity(0.3),
+                            ),
+                            child: Slider(
+                              value: position.inSeconds
+                                  .toDouble()
+                                  .clamp(0.0, duration.inSeconds.toDouble()),
+                              min: 0.0,
+                              max: duration.inSeconds.toDouble(),
+                              onChangeStart: (value) {
+                                setState(() {
+                                  _isSeeking = true;
+                                });
+                              },
+                              onChanged: (value) {
+                                setState(() {});
+                              },
+                              onChangeEnd: (value) {
+                                _videoController!
+                                    .seekTo(Duration(seconds: value.toInt()));
+                                setState(() {
+                                  _isSeeking = false;
+                                });
+                                _hideControlsAfterDelay();
+                              },
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Bottom row with play button and fullscreen
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _videoController!.value.isPlaying
+                                ? Icons.pause
+                                : Icons.play_arrow,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (_videoController!.value.isPlaying) {
+                                _showControls = true;
+                                _videoController!.pause();
+                              } else {
+                                _videoController!.play();
+                                _hideControlsAfterDelay();
+                              }
+                            });
+                          },
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(
+                            _isFullScreen
+                                ? Icons.fullscreen_exit
+                                : Icons.fullscreen,
+                            color: Colors.white,
+                          ),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      )
-      ..loadHtmlString(html);
+      ),
+    ),
+  );
+}
 
-    setState(() {});
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required double size,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: size),
+        onPressed: onPressed,
+        padding: EdgeInsets.all(size * 0.3),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    
+    if (hours > 0) {
+      return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+    }
   }
 
   Widget _buildLessonInfo(Lesson lesson, bool isCompleted) {
@@ -644,9 +896,7 @@ class _LessonDetailViewState extends ConsumerState<LessonDetailView> {
           ),
           const SizedBox(height: 8),
           Text(
-            lesson.content.isNotEmpty
-                ? lesson.content
-                : 'No description available',
+            lesson.content.isNotEmpty ? lesson.content : 'No description available',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],

@@ -7,6 +7,7 @@ import '../../providers/auth_session_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../services/course_service.dart';
 import '../../shared/navigation_utils.dart';
+import 'write_review_view.dart';
 
 class CourseDetailView extends ConsumerStatefulWidget {
   final int courseId;
@@ -19,11 +20,19 @@ class CourseDetailView extends ConsumerStatefulWidget {
 
 class _CourseDetailViewState extends ConsumerState<CourseDetailView> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {
+          _currentTabIndex = _tabController.index;
+        });
+      }
+    });
   }
 
   @override
@@ -62,82 +71,65 @@ class _CourseDetailViewState extends ConsumerState<CourseDetailView> with Single
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, CourseDetail courseDetail) {
-    return Column(
-      children: [
-        _buildAppBar(context, courseDetail),
-        Expanded(
-          child: Column(
-            children: [
-              _buildCourseInfo(courseDetail),
-              const SizedBox(height: 16),
-              _buildEnrollButton(context, ref, courseDetail),
-              const SizedBox(height: 8),
-              if (courseDetail.userAccess.isEnrolled)
-                _buildProgressSection(courseDetail),
-              if (courseDetail.userAccess.isEnrolled)
-                const SizedBox(height: 16),
-              _buildTabBar(),
-              Expanded(
-                child: _buildTabBarView(context, ref, courseDetail),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context, CourseDetail courseDetail) {
     final course = courseDetail.course;
     
-    return Container(
-      height: 250,
-      decoration: BoxDecoration(
-        color: const Color(0xFF581C87),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          CachedNetworkImage(
-            imageUrl: course.imageUrl,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey[300],
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(
-                  Icons.play_circle_outline,
-                  size: 80,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 250,
+          pinned: true,
+          backgroundColor: const Color(0xFF581C87),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.3),
-                  const Color(0xFF581C87).withOpacity(0.9),
-                ],
-              ),
+          title: Text(
+            course.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          flexibleSpace: FlexibleSpaceBar(
+            background: Stack(
+              fit: StackFit.expand,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+                CachedNetworkImage(
+                  imageUrl: course.imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[300],
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_outline,
+                        size: 80,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
                 ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.all(16),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.3),
+                        const Color(0xFF581C87).withOpacity(0.9),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
                   child: Text(
                     course.title,
                     style: const TextStyle(
@@ -152,8 +144,26 @@ class _CourseDetailViewState extends ConsumerState<CourseDetailView> with Single
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              _buildCourseInfo(courseDetail),
+              const SizedBox(height: 16),
+              _buildEnrollButton(context, ref, courseDetail),
+              const SizedBox(height: 8),
+              if (courseDetail.userAccess.isEnrolled)
+                _buildProgressSection(courseDetail),
+              if (courseDetail.userAccess.isEnrolled)
+                const SizedBox(height: 16),
+              _buildTabBar(),
+            ],
+          ),
+        ),
+        _currentTabIndex == 0
+            ? _buildCourseContentSlivers(context, courseDetail)
+            : _buildReviewsSlivers(context, ref, courseDetail),
+      ],
     );
   }
 
@@ -328,24 +338,18 @@ class _CourseDetailViewState extends ConsumerState<CourseDetailView> with Single
     );
   }
 
-  Widget _buildTabBarView(BuildContext context, WidgetRef ref, CourseDetail courseDetail) {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildCourseContentTab(context, courseDetail),
-        _buildReviewsTab(context, ref, courseDetail),
-      ],
-    );
-  }
-
-  Widget _buildCourseContentTab(BuildContext context, CourseDetail courseDetail) {
-    return ListView.builder(
+  Widget _buildCourseContentSlivers(BuildContext context, CourseDetail courseDetail) {
+    return SliverPadding(
       padding: const EdgeInsets.all(16),
-      itemCount: courseDetail.modules.length,
-      itemBuilder: (context, moduleIndex) {
-        final module = courseDetail.modules[moduleIndex];
-        return _buildModuleSection(context, module, courseDetail);
-      },
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final module = courseDetail.modules[index];
+            return _buildModuleSection(context, module, courseDetail);
+          },
+          childCount: courseDetail.modules.length,
+        ),
+      ),
     );
   }
 
@@ -603,41 +607,55 @@ class _CourseDetailViewState extends ConsumerState<CourseDetailView> with Single
     );
   }
 
-  Widget _buildReviewsTab(BuildContext context, WidgetRef ref, CourseDetail courseDetail) {
+  Widget _buildReviewsSlivers(BuildContext context, WidgetRef ref, CourseDetail courseDetail) {
     final reviewsState = ref.watch(courseReviewsProvider(widget.courseId));
+    final authState = ref.watch(authSessionProvider);
+    final isCompleted = courseDetail.userProgress.progressPercentage >= 100;
 
     return reviewsState.when(
       data: (reviewsData) {
         if (reviewsData.reviews.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.rate_review_outlined, size: 80, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'No reviews yet',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+          return SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 80, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No reviews yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Be the first to review this course!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Be the first to review this course!',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
                   ),
-                ),
-              ],
+                  if (isCompleted && authState.token != null) ...[
+                    const SizedBox(height: 24),
+                    _buildReviewButton(context, courseDetail, reviewsData),
+                  ],
+                ],
+              ),
             ),
           );
         }
 
-        return Column(
-          children: [
+        return SliverList(
+          delegate: SliverChildListDelegate([
+            // Write/Edit Review Button (at top if completed)
+            if (isCompleted && authState.token != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: _buildReviewButton(context, courseDetail, reviewsData),
+              ),
             // Rating Summary Header
             Container(
               margin: const EdgeInsets.all(16),
@@ -750,36 +768,72 @@ class _CourseDetailViewState extends ConsumerState<CourseDetailView> with Single
               ),
             ),
             // Reviews List
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: reviewsData.reviews.length,
-                itemBuilder: (context, index) {
-                  final review = reviewsData.reviews[index];
-                  return _buildReviewCard(review);
-                },
-              ),
-            ),
-          ],
+            ...reviewsData.reviews.map((review) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildReviewCard(review),
+            )),
+          ]),
         );
       },
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF581C87)),
+      loading: () => const SliverFillRemaining(
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFF581C87)),
+        ),
       ),
-      error: (error, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load reviews',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
+      error: (error, stack) => SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load reviews',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewButton(BuildContext context, CourseDetail courseDetail, CourseReviewsData reviewsData) {
+    final authState = ref.read(authSessionProvider);
+    
+    // Check if user has already reviewed
+    final userHasReviewed = reviewsData.reviews.any((review) => 
+      !review.isAnonymous && review.userName == authState.user?.name
+    );
+
+    return ElevatedButton.icon(
+      onPressed: () async {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WriteReviewView(
+              courseId: widget.courseId,
+              courseTitle: courseDetail.course.title,
             ),
-          ],
+          ),
+        );
+
+        // Refresh reviews if a review was submitted
+        if (result == true && mounted) {
+          ref.invalidate(courseReviewsProvider(widget.courseId));
+        }
+      },
+      icon: Icon(userHasReviewed ? Icons.edit : Icons.rate_review),
+      label: Text(userHasReviewed ? 'Edit My Review' : 'Write a Review'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF581C87),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
