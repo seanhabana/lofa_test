@@ -8,31 +8,56 @@ import '../dashboard/home_screen.dart';
 import './loginpage.dart';
 import '../../providers/auth_session_provider.dart';
 
-class SplashScreen extends ConsumerWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authSessionProvider);
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+}
 
-    ref.listen(authSessionProvider, (prev, next) {
-      if (!next.isLoading) {
-        debugPrint('🧭 Splash decision: loggedIn=${next.isLoggedIn}');
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _hasNavigated = false;
 
-        if (next.isLoggedIn) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomePage()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const OnboardingPage()),
-          );
-        }
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _startLogoAnimationAndNavigate();
+  }
 
+  void _startLogoAnimationAndNavigate() async {
+    // Wait for the logo animation to complete (2.5 seconds total)
+    await Future.delayed(const Duration(milliseconds: 2500));
+
+    if (!mounted || _hasNavigated) return;
+
+    // Wait until session is loaded
+    while (ref.read(authSessionProvider).isLoading && mounted) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+    }
+
+    if (_hasNavigated || !mounted) return;
+
+    final auth = ref.read(authSessionProvider);
+    _hasNavigated = true;
+
+    debugPrint('🧭 Navigating after logo: loggedIn=${auth.isLoggedIn}');
+
+    if (auth.isLoggedIn) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomePage()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingPage()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FB),
       body: Stack(
